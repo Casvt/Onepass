@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<link rel="stylesheet" href="/static/css/general.css">
+	<link rel="stylesheet" href="/static/css/login.css">
+	
+	<title>Create account | Onepass</title>
+</head>
+<body>
+	<main>
+		<div class="title-text">
+			<h1>Onepass</h1>
+			<p>Create an account</p>
+		</div>
+		<form id="login-form" method="post">
+			<div class="form-entry">
+				<label for="username-input">Username</label>
+				{% if error != '' %}<p class="error-message">{{error}}</p>{% endif %}
+				<input type="text" name="username" id="username-input">
+			</div>
+			<div class="form-entry">
+				<label for="password-input">Password</label>
+				<input type="password" name="password" id="passsword-input">
+			</div>
+			<a href="/" class="create-link">Log in to an account</a>
+		</form>
+		<input class="login-submit" type="submit" value="Create account" form="login-form">
+	</main>
+</body>
+</html>

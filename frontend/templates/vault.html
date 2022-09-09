@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="/static/css/general.css">
+	<link rel="stylesheet" href="/static/css/vault.css">
+	<script src="/static/js/auth_checker.js" defer></script>
+	<script src="/static/js/vault.js" defer></script>
+
+	<title>Vault | Onepass</title>
+</head>
+<body>
+	<header>
+		<div class="menu-title-container">
+			<button class="toggle-nav" id="nav-button" aria-label="toggle menu">
+				<img src="/static/img/menu.svg" alt="Menu icon" class="search-icon">
+			</button>
+			<p>Onepass Vault</p>
+			<button class="search-button" id="search-toggle" aria-label="toggle search">
+				<img src="/static/img/search.svg" alt="Search icon" class="search-icon">
+			</button>
+		</div>
+		<div class="search-bar" id="search-bar">
+			<button class="search-button" id="search-button">
+				<img class="search-icon" src="/static/img/search.svg" alt="Search icon">
+			</button>
+			<input class="search-input" id="search-input" type="text">
+		</div>
+	</header>
+	<div class="nav-main">
+		<nav id="nav">
+			<a class="nav-entry current-nav" href="/vault">Vault</a>
+				<a class="sub-nav-entry" href="/vault/add-password">Add password</a>
+				<a class="sub-nav-entry" href="/check-password">Check password</a>
+			<a class="nav-entry" href="/settings">Settings</a>
+		</nav>
+		<main id="vault"></main>
+	</div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<link rel="stylesheet" href="/static/css/general.css">
+	<link rel="stylesheet" href="/static/css/login.css">
+	<script src="/static/js/login.js" defer></script>
+	
+	<title>Login | Onepass</title>
+</head>
+<body>
+	<main>
+		<div class="title-text">
+			<h1>Onepass</h1>
+			<p>Please log in</p>
+		</div>
+		<form id="login-form">
+			<div class="form-entry">
+				<label for="username-input">Username</label>
+				<p id="username-error" class="error-message" class="hidden"></p>
+				<input type="text" name="username" id="username-input" autofocus>
+			</div>
+			<div class="form-entry">
+				<label for="password-input">Password</label>
+				<p id="password-error" class="error-message" class="hidden"></p>
+				<input type="password" name="password" id="password-input">
+			</div>
+			<a href="/create" class="create-link">Create an account</a>
+		</form>
+		<input class="login-submit" type="submit" value="Login" form="login-form">
+	</main>
+</body>
+</html>

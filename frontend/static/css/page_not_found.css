@@ -1,0 +1,23 @@
+body {
+	width: 100vw;
+	height: 100vh;
+	background: var(--gradient);
+}
+
+.title-container {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	
+	color: var(--light-color);
+	background-color: var(--dark-color);
+	padding: 3rem;
+	border-radius: 4px;
+	
+	font-size: 3rem;
+}
+
+.title-container > * {
+	text-align: center;
+}

@@ -1,0 +1,35 @@
+* {
+	box-sizing: border-box;
+	margin: 0;
+	border: 0;
+}
+
+:root {
+	--dark-color: rgb(53, 53, 53);
+	--light-color: rgb(255, 255, 255);
+	--accent-color: rgb(5, 168, 170);
+	--dark-accent-color: rgb(18, 36, 63);
+	--error-color: rgb(219, 84, 97);
+	--success-color: rgb(84, 219, 104);
+	--gradient: linear-gradient(225deg, var(--accent-color) 0%, var(--dark-accent-color) 100%);
+	
+	--nav-width: clamp(11.2rem, 20%, 15rem);
+}
+
+body {
+	background-color: var(--light-color);
+	height: 100vh;
+}
+
+main {
+	overflow-y: auto;
+}
+
+.error-message {
+	color: var(--error-color) !important;
+	font-size: 1rem !important;
+}
+
+.hidden {
+	display: none;
+}

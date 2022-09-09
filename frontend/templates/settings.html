@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<link rel="stylesheet" href="/static/css/general.css">
+	<link rel="stylesheet" href="/static/css/settings.css">
+	<script src="/static/js/auth_checker.js" defer></script>
+	<script src="/static/js/settings.js" defer></script>
+
+	<title>Settings | Onepass</title>
+</head>
+<body>
+	<header>
+		<div class="menu-title-container">
+			<button class="toggle-nav" id="nav-button" aria-label="toggle menu">
+				<img src="/static/img/menu.svg" alt="Menu icon" class="search-icon">
+			</button>
+			<p>Onepass Vault</p>
+		</div>
+	</header>
+	<div class="nav-main">
+		<nav id="nav">
+			<a class="nav-entry" href="/vault">Vault</a>
+				<a class="sub-nav-entry" href="/vault/add-password">Add password</a>
+				<a class="sub-nav-entry" href="/check-password">Check password</a>
+			<a class="nav-entry current-nav" href="/settings">Settings</a>
+		</nav>
+		<main id="settings">
+			<h2>Reset master password</h2>
+			<form class="reset-form" method="post">
+				<div>
+					<label for="edit_username">Username</label>
+					<input type="text" name="username" id="edit_username">
+				</div>
+				<div>
+					<label for="old_password">Old password</label>
+					<input type="password" name="old_password" id="old_password">
+				</div>
+				<div>
+					<label for="new_password">New password</label>
+					<input type="password" name="new_password" id="new_password">
+				</div>
+				<button type="submit" class="button edit_password">Change</button>
+			</form>
+			<h2>Delete account</h2>
+			<form class="reset-form" id="delete-form">
+				<div>
+					<label for="old_password">Username</label>
+					<input type="text" name="username" id="username">
+				</div>
+				<div>
+					<label for="new_password">Password</label>
+					<input type="password" name="password" id="password">
+				</div>
+				<button type="submit" class="button delete_account" id="delete-account">Delete</button>
+			</form>
+		</main>
+	</div>
+</body>
+</html>
