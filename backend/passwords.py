@@ -4,20 +4,16 @@ from os.path import dirname, join
 from urllib import request
 from hashlib import sha1
 from typing import List
+from flask import g
 
 from backend.custom_exceptions import BadPassword, IdNotFound
-from backend.security import encrypt, decrypt
+from backend.security import encrypt, decrypt, hash_password, get_key
 from backend.db import get_db
 
-def add_password(
-	hash_encrypted_key: str, raw_key: bytes,
-	title: str, url: str=None, username: str=None, password: str=None
-) -> int:
+def add_password(title: str, url: str=None, username: str=None, password: str=None) -> int:
 	"""Add a password to the vault
 
 	Args:
-		hash_encrypted_key (str): The hash of the encrypted key of the user
-		raw_key (bytes): The decrypted key of the user
 		title (str): The title of the entry
 		url (str, optional): The url of the entry. Defaults to None.
 		username (str, optional): The username of the entry. Defaults to None.
@@ -26,42 +22,39 @@ def add_password(
 	Returns:
 		int: The id of the new entry
 	"""
+	raw_key, hash_key = get_key()
+
 	insert_keys = ['title']
-	insert_values = [encrypt(raw_key, title.encode('utf-8'))]
+	insert_values = [encrypt(raw_key, title.encode())]
 	del title
 	if url != None:
 		insert_keys.append('url')
-		insert_values.append(encrypt(raw_key, url.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, url.encode()))
 		del url
 	if username != None:
 		insert_keys.append('username')
-		insert_values.append(encrypt(raw_key, username.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, username.encode()))
 		del username
 	if password != None:
 		insert_keys.append('password')
-		insert_values.append(encrypt(raw_key, password.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, password.encode()))
 		del password
 	del raw_key
 
 	cursor = get_db()
 
 	cursor.execute(f"""
-		INSERT INTO `{hash_encrypted_key}`({','.join(insert_keys)})
+		INSERT INTO `{hash_key}`({','.join(insert_keys)})
 		VALUES ({','.join(['?'] * len(insert_values))})
 	""", insert_values)
 	id = cursor.lastrowid
 
 	return id
 
-def get_password(
-	hash_encrypted_key: str, raw_key: bytes,
-	id: int
-) -> dict:
+def get_password(id: int) -> dict:
 	"""Get a password from the vault
 
 	Args:
-		hash_encrypted_key (str): The hash of the encrypted key of the user
-		raw_key (bytes): The decrypted key of the user
 		id (int): The id of the password entry
 
 	Raises:
@@ -71,9 +64,10 @@ def get_password(
 		dict: title, url, username and password in decrypted form
 	"""
 	cursor = get_db(output_type='dict')
+	raw_key, hash_key = get_key()
 
 	#check if password exists
-	cursor.execute(f"SELECT id, title, url, username, password FROM `{hash_encrypted_key}` WHERE id = ?", (id,))
+	cursor.execute(f"SELECT id, title, url, username, password FROM `{hash_key}` WHERE id = ?", (id,))
 	result = cursor.fetchone()
 	if result == None:
 		raise IdNotFound
@@ -82,15 +76,12 @@ def get_password(
 	return info
 
 def edit_password(
-	hash_encrypted_key: str, raw_key: bytes,
 	id: int,
 	title: str=None, url: str=None, username: str=None, password: str=None,
 ) -> dict:
 	"""Edit a password entry in the vault
 
 	Args:
-		hash_encrypted_key (str): The hash of the encrypted key of the user
-		raw_key (bytes): The decrypted key of the user
 		id (int): The id of the password entry
 		title (str, optional): The new value for the title. Defaults to None.
 		url (str, optional): The new value for the url. Defaults to None.
@@ -104,9 +95,10 @@ def edit_password(
 		dict: The (new) info of the password entry
 	"""
 	cursor = get_db()
+	raw_key, hash_key = get_key()
 
 	#check if password exists
-	cursor.execute(f"SELECT id FROM `{hash_encrypted_key}` WHERE id = ?", (id,))
+	cursor.execute(f"SELECT id FROM `{hash_key}` WHERE id = ?", (id,))
 	if cursor.fetchone() == None:
 		raise IdNotFound
 
@@ -115,37 +107,33 @@ def edit_password(
 
 	if title != None:
 		insert_keys.append('title = ?')
-		insert_values.append(encrypt(raw_key, title.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, title.encode()))
 		del title
 	if url != None:
 		insert_keys.append('url = ?')
-		insert_values.append(encrypt(raw_key, url.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, url.encode()))
 		del url
 	if username != None:
 		insert_keys.append('username = ?')
-		insert_values.append(encrypt(raw_key, username.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, username.encode()))
 		del username
 	if password != None:
 		insert_keys.append('password = ?')
-		insert_values.append(encrypt(raw_key, password.encode('utf-8')))
+		insert_values.append(encrypt(raw_key, password.encode()))
 		del password
 
 	cursor.execute(f"""
-		UPDATE `{hash_encrypted_key}`
+		UPDATE `{hash_key}`
 		SET {','.join(insert_keys)}
 		WHERE id = ?
 	""", insert_values + [id])
 
-	return get_password(hash_encrypted_key, raw_key, id=id)
+	return get_password(id)
 
-def delete_password(
-	hash_encrypted_key: str,
-	id: int,
-) -> None:
+def delete_password(id: int) -> None:
 	"""Remove a password entry from the vault
 
 	Args:
-		hash_encrypted_key (str): The hash of the encrypted key of the user
 		id (int): The id of the password entry
 
 	Raises:
@@ -155,48 +143,39 @@ def delete_password(
 		None: Password entry successfully removed
 	"""
 	cursor = get_db()
+	hash_key = get_key()[1]
 
-	cursor.execute(f"SELECT * FROM `{hash_encrypted_key}` WHERE id = ?", (id,))
+	cursor.execute(f"SELECT * FROM `{hash_key}` WHERE id = ?", (id,))
 	if cursor.fetchone() == None:
 		return IdNotFound
 
-	cursor.execute(f"DELETE FROM `{hash_encrypted_key}` WHERE id = ?", (id,))
+	cursor.execute(f"DELETE FROM `{hash_key}` WHERE id = ?", (id,))
 
 	return
 
-def list_passwords(
-	hash_encrypted_key: str, raw_key: bytes,
-) -> List[dict]:
+def list_passwords() -> List[dict]:
 	"""List all passwords in the vault
-
-	Args:
-		hash_encrypted_key (str): The hash of the encrypted key of the user
-		raw_key (bytes): The decrypted key of the user
 
 	Returns:
 		list: The id, title and username of every password entry
 	"""
 	cursor = get_db(output_type='dict')
 
-	cursor.execute(f"SELECT id, title, username FROM `{hash_encrypted_key}`;")
+	raw_key = decrypt(g.raw_api_key.encode(), g.user_info['key'], encode=True)
+	hash_key = hash_password(g.user_info['salt'], raw_key).decode()
+	cursor.execute(f"SELECT id, title, username FROM `{hash_key}`;")
 	return sorted([{k: decrypt(raw_key, bytes(v)).decode() if not (k == 'id' or v == None) else v for k, v in dict(e).items()} for e in cursor.fetchall()], key=lambda i: (i['title'], i['username']))
 
-def search_passwords(
-	hash_encrypted_key: str, raw_key: bytes,
-	query: str
-) -> List[dict]:
+def search_passwords(query: str) -> List[dict]:
 	"""Query the vault with a search term (username or title needs to contain or match query for entry to match)
 
 	Args:
-		hash_encrypted_key (str): The hash of the encrypted key of the user
-		raw_key (bytes): The decrypted key of the user
 		query (str): The term to search for
 
 	Returns:
 		list: The id, title and username of every matching password entry
 	"""
-	result = list_passwords(hash_encrypted_key, raw_key)
-	del raw_key
+	result = list_passwords()
 	query = query.lower()
 	filtered_items = []
 	for i in result:
@@ -235,7 +214,7 @@ def check_password_pwned(password: str) -> None:
 		password (str): The password to check
 
 	Raises:
-		BadPassword: The password is has been pwned
+		BadPassword: The password has been pwned
 	
 	Returns:
 		None: The password has not been pwned and thus passes the check
@@ -246,4 +225,3 @@ def check_password_pwned(password: str) -> None:
 		raise BadPassword(f'Password has been seen {str(f"{count:_}").replace("_",".")} times before in database leaks')
 
 	return
-

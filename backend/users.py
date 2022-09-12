@@ -1,9 +1,10 @@
 #-*- coding: utf-8 -*-
 
 from typing import Tuple
+from flask import g
 
 from backend.custom_exceptions import *
-from backend.security import generate_key, check_password, hash_password, encrypt
+from backend.security import generate_key, get_key, check_password, hash_password, encrypt
 from backend.db import get_db
 
 ONEPASS_USERNAME_CHARACTERS = 'abcedfghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.!@$'
@@ -28,6 +29,8 @@ def register_user(username: str, password: str) -> int:
 	#check if username is valid
 	if username in ONEPASS_INVALID_USERNAMES:
 		raise UsernameInvalid
+	if username.isdigit():
+		raise UsernameInvalid
 	for i in username:
 		if not str(i) in ONEPASS_USERNAME_CHARACTERS:
 			raise UsernameInvalid(f'The following character is not allowed: {str(i)}')
@@ -38,7 +41,7 @@ def register_user(username: str, password: str) -> int:
 		raise UsernameTaken
 
 	#generate salt and key exclusive for user
-	salt, encrypted_key, hash_encrypted_key = generate_key(password=password)
+	salt, encrypted_key, hash_key = generate_key(password=password)
 	del password
 
 	#add user to userlist and create it's "vault"
@@ -49,7 +52,7 @@ def register_user(username: str, password: str) -> int:
 	del username
 	user_id = cursor.lastrowid
 	cursor.execute(f"""
-		CREATE TABLE `{hash_encrypted_key}` (
+		CREATE TABLE `{hash_key}` (
 			id INTEGER PRIMARY KEY,
 			title VARCHAR(254),
 			url TEXT,
@@ -60,101 +63,78 @@ def register_user(username: str, password: str) -> int:
 
 	return user_id
 
-def access_user(username: str, password: str) -> Tuple[str, bytes]:
-	"""Check if login credentials are correct for a user
+def access_user(user: str, password: str) -> Tuple[bytes, int, bytes]:
+	"""Get access to a user accounts info
 
 	Args:
-		username (str): The username
-		password (str): The master password of the user
+		user (str): The username of the user account
+		password (str): The master password of the user account
 
 	Raises:
 		UsernameNotFound: The username is not found
-		PasswordInvalid: The master password is incorrect
+		PasswordInvalid: The master password is not correct
 
 	Returns:
-		tuple: Both elements in str format. First is hash of encrypted key of user. Second is raw key of user.
+		Tuple[bytes, int, bytes]: The raw key (1), user id (2) and salt (3) of the user account
 	"""
 	cursor = get_db(output_type='dict')
 
 	#check if user exists
-	cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-	del username
+	if user.isdigit():
+		cursor.execute("SELECT * FROM users WHERE id = ?", (user,))
+	else:
+		cursor.execute("SELECT * FROM users WHERE username = ?", (user,))
+	del user
 	result = cursor.fetchone()
 	if result == None:
 		raise UsernameNotFound
-	result = dict(result)
 
 	#check if password is correct
-	try:
-		return check_password(salt=result['salt'], password=password, key=result['key'])
-	except PasswordInvalid:
-		#password is not correct
-		pass
-	raise PasswordInvalid
+	return check_password(salt=result['salt'], password=password, key=result['key']), result['id'], result['salt']
 
-def edit_user_password(username: str, old_password: str, new_password: str) -> None:
+def edit_user_password(old_password: str, new_password: str) -> None:
 	"""Edit the master password of the user
 
 	Args:
-		username (str): The username of the user to target
 		old_password (str): The current master password
 		new_password (str): The new master password
 
 	Raises:
-		UsernameNotFound: The username is not found
-		PasswordInvalid: The old master password is incorrect
+		PasswordInvalid: The master password (old_password) is not correct
 
 	Returns:
 		None: password successfully changed
 	"""
+	access_user(str(g.user_info['user_id']), old_password)
 	cursor = get_db()
 
-	#get hash of encrypted key of user
-	hash_encrypted_key, raw_key = access_user(username, old_password)
-
-	#get salt and encrypted key of user
-	cursor.execute("SELECT salt FROM users WHERE username = ?;", (username,))
+	raw_key = get_key()[0]
+	cursor.execute("SELECT salt FROM users WHERE id = ?;", (g.user_info['user_id'],))
 	salt = cursor.fetchone()[0]
 
 	#encrypt raw key with new password
-	new_hashed_password = hash_password(salt, new_password.encode('utf-8'))
+	new_hashed_password = hash_password(salt, new_password.encode())
 	del new_password
 	new_encrypted_key = encrypt(new_hashed_password, raw_key)
 
 	#insert new encrypted key
-	cursor.execute("UPDATE users SET key = ? WHERE username = ?;", (new_encrypted_key, username))
-	del username
-
-	#update table name of user
-	new_hash_encrypted_key = hash_password(new_hashed_password, new_encrypted_key).decode()
-	cursor.execute(f"ALTER TABLE `{hash_encrypted_key}` RENAME TO `{new_hash_encrypted_key}`;")
+	cursor.execute("UPDATE users SET key = ? WHERE id = ?;", (new_encrypted_key, g.user_info['user_id']))
 
 	return
 
-def delete_user(username: str, password: str) -> None:
+def delete_user() -> None:
 	"""Delete a user
-
-	Args:
-		username (str): The username of the user to delete
-		password (str): The master password of the user
-
-	Raises:
-		UsernameNotFound: The username is not found
-		PasswordInvalid: The old master password is incorrect
 
 	Returns:
 		None: user successfully deleted
 	"""
-
 	cursor = get_db()
 
 	#get hash of encrypted key of user
-	hash_encrypted_key = access_user(username, password)[0]
-	del password
+	hash_key = get_key()[1]
 
 	#delete in database
-	cursor.execute("DELETE FROM users WHERE username = ?;", (username,))
-	del username
-	cursor.execute(f"DROP TABLE IF EXISTS `{hash_encrypted_key}`;")
+	cursor.execute("DELETE FROM users WHERE id = ?;", (g.user_info['user_id'],))
+	cursor.execute(f"DROP TABLE IF EXISTS `{hash_key}`;")
 
 	return

@@ -1,70 +1,161 @@
 #-*- coding: utf-8 -*-
 
-from backend.backend import *
+from backend.users import access_user, delete_user, register_user, edit_user_password
+from backend.passwords import list_passwords, add_password, search_passwords, get_password, edit_password, delete_password, check_password_popularity, check_password_pwned
+from backend.security import encrypt
+from backend.custom_exceptions import *
 
-from flask import Blueprint, request
+from flask import Blueprint, request, g
 from hashlib import sha1
 from os import urandom
+from time import time
 
 api = Blueprint('api', __name__)
 api_key_map = {}
-user_info_map = {}
 
 #===================
 # Authentication endpoints
 #===================
 
+"""
+AUTHENTICATION:
+	After making a POST /auth/login request, you'll receive an api_key in the output.
+	From then on, make all requests with the url parameter api_key, where the value is the string you received.
+	One hour after logging in, the api key expires and you are required to login again to get a new api_key.
+
+	If no api key is supplied or it is invalid, 401 'ApiKeyInvalid' is returned.
+	If the api key supplied has expired, 401 'ApiKeyExpired' is returned.
+"""
+
 def auth(method):
+	"""Used as decorator and, if applied to route, restricts the route to authorized users and supplies user specific info
+	"""
 	def wrapper(*args,**kwargs):
-		if sha1(request.values.to_dict().get('api_key','').encode('utf-8')).hexdigest() in api_key_map.get(request.remote_addr, []):
+		global api_key_map
+		api_key = sha1(request.values.get('api_key','').encode()).hexdigest()
+		if api_key_map.get(api_key, {}).get('exp', 0) > time():
+			g.raw_api_key = request.values.get('api_key','')
+			g.api_key = api_key
+			g.user_info = api_key_map[api_key]
 			return method(*args, **kwargs)
 		else:
-			return {'error': 'ApiKeyInvalid', 'result': {}}, 401
+			if not api_key in api_key_map:
+				#api key not registered
+				return {'error': 'ApiKeyInvalid', 'result': {}}, 401
+			else:
+				#api key expired
+				del api_key_map[api_key]
+				return {'error': 'ApiKeyExpired', 'result': {}}, 401
 	wrapper.__name__ = method.__name__
 	return wrapper
 
-@api.route('/login', methods=['POST'])
+@api.route('/auth/login', methods=['POST'])
 def api_login():
-	global api_key_map, user_info_map
+	"""
+	Endpoint: /auth/login
+	Description: Login to a user account
+	Requires being logged in: No
+	Methods:
+		POST:
+			Parameters (url):
+				username (required): the username of the user account
+				password (required): the password of the user account
+			Returns:
+				200:
+					The apikey to use for further requests and expiration time (epoch)
+				400:
+					KeyNotFound: One of the required parameters was not given
+				401:
+					PasswordInvalid: The password given is not correct for the user account
+				404:
+					UsernameNotFound: The username was not found
+	"""
+	global api_key_map
 	data = request.values.to_dict()
 
 	#check if required keys are given
 	for required_key in ('username','password'):
 		if not required_key in data:
-			return {'error': 'KeyNotFoundInBody', 'result': {'key': required_key}}, 400
+			return {'error': 'KeyNotFound', 'result': {'key': required_key}}, 400
 
 	#check credentials
 	try:
-		hash_encrypted_key, raw_key = access_user(data['username'],data['password'])
+		raw_key, user_id, salt = access_user(data['username'], data['password'])
 	except UsernameNotFound:
 		return {'error': 'UsernameNotFound', 'result': {}}, 404
 	except PasswordInvalid:
 		return {'error': 'PasswordInvalid', 'result': {}}, 401
 	else:
 		#login valid
-		api_key = sha1(urandom(32)).hexdigest()[:32]
-		hashed_api_key = sha1(api_key.encode('utf-8')).hexdigest()
-		api_key_map[request.remote_addr] = api_key_map.get(request.remote_addr, []) + [hashed_api_key]
-		user_info_map[request.remote_addr] = {'hash_encrypted_key': hash_encrypted_key, 'raw_key': raw_key}
-		return {'error': None, 'result': {'api_key': api_key}}, 200
+		while 1:
+			api_key = sha1(urandom(32)).hexdigest()[:32]
+			hashed_api_key = sha1(api_key.encode()).hexdigest()
+			if not hashed_api_key in api_key_map:
+				break
+		encrypted_raw_key = encrypt(api_key.encode(), raw_key, encode=True)
+		del raw_key
+		exp = time() + 3600
+		api_key_map[hashed_api_key] = {'key': encrypted_raw_key, 'salt': salt, 'user_id': user_id, 'exp': exp}
+		return {'error': None, 'result': {'api_key': api_key, 'expires': exp}}, 200
 
-@api.route('/logout', methods=['POST'])
+@api.route('/auth/logout', methods=['POST'])
 @auth
 def api_logout():
-	global api_key_map, user_info_map
-	hashed_api_key = sha1(request.values.to_dict().get('api_key','').encode('utf-8')).hexdigest()
-	api_key_map[request.remote_addr].remove(hashed_api_key)
-	user_info_map.pop(request.remote_addr)
+	"""
+	Endpoint: /auth/logout
+	Description: Logout of a user account
+	Requires being logged in: Yes
+	Methods:
+		POST:
+			Returns:
+				200:
+					Logout successful
+	"""
+	global api_key_map
+	del api_key_map[g.api_key]
 	return {'error': None, 'result': {}}, 200
+
+@api.route('/auth/status', methods=['GET'])
+@auth
+def api_status():
+	"""
+	Endpoint: /auth/status
+	Description: Get current status of login
+	Requires being logged in: Yes
+	Methods:
+		GET:
+			Returns:
+				200:
+					The id of the user account and the expiration time of the api key (epoch)
+	"""
+	exp = api_key_map[g.api_key]['exp']
+	user_id = api_key_map[g.api_key]['user_id']
+	return {'error': None, 'result': {'expires': exp, 'user_id': user_id}}, 200
 
 #===================
 # User endpoints
-# These do not require token authentication and instead rely on parsing user data via arguments.
 #===================
 
 @api.route('/user/add', methods=['POST'])
 def api_add_user():
-	data = request.values.to_dict()
+	"""
+	Endpoint: /user/add
+	Description: Create a new user account
+	Requires being logged in: No
+	Methods:
+		POST:
+			Parameters (url):
+				username (required): the username of the new user account
+				password (required): the password of the new user account
+			Returns:
+				201:
+					The user id of the new user account
+				400:
+					KeyNotFound: One of the required parameters was not given
+					UsernameInvalid: The username given is not allowed
+					UsernameTaken: The username given is already in use
+	"""
+	data = request.values
 
 	#check if required keys are given
 	for required_key in ('username','password'):
@@ -80,56 +171,94 @@ def api_add_user():
 		return {'error': 'UsernameTaken', 'result': {}}, 400
 	else:
 		return {'error': None, 'result': {'user_id': user_id}}, 201
-
-@api.route('/user/edit', methods=['PUT'])
-def api_edit_user():
-	data = request.values.to_dict()
-	
-	#check if required keys are given
-	for required_key in ('username','old_password','new_password'):
-		if not required_key in data:
-			return {'error': 'KeyNotFound', 'result': {'key': required_key}}, 400
-	
-	#edit user
-	try:
-		edit_user_password(data['username'], data['old_password'], data['new_password'])
-	except UsernameNotFound:
-		return {'error': 'UsernameNotFound', 'result': {}}, 404
-	except PasswordInvalid:
-		return {'error': 'PasswordInvalid', 'result': {}}, 401
-	else:
-		return {'error': None, 'result': {}}, 200
 		
-@api.route('/user', methods=['DELETE'])
-def api_delete_user():
-	data = request.values.to_dict()
-	
-	#check if required keys are given
-	for required_key in ('username','password'):
-		if not required_key in data:
-			return {'error': 'KeyNotFoundInBody', 'result': {'key': required_key}}, 400
+@api.route('/user', methods=['GET','PUT','DELETE'])
+@auth
+def api_manage_user():
+	"""
+	Endpoint: /user
+	Description: Manage a user account
+	Requires being logged in: Yes
+	Methods:
+		GET:
+			Returns:
+				200:
+					The user id of the user account
+		PUT:
+			Description: Change the master password of the user account
+			Parameters (url):
+				old_password (required): the current password of the user account
+				new_password (required): the new password of the user account
+			Returns:
+				200:
+					Password updated successfully
+				400:
+					KeyNotFound: One of the required parameters was not given
+					PasswordInvalid: The current password is incorrect
+		DELETE:
+			Description: Delete the user account
+			Returns:
+				200:
+					Account deleted successfully
+	"""
+	if request.method == 'GET':
+		return {'error': None, 'result': {'user_id': g.user_info['user_id']}}, 200
 
-	#delete user
-	try:
-		delete_user(data['username'], data['password'])
-	except UsernameNotFound:
-		return {'error': 'UsernameNotFound', 'result': {}}, 404
-	except PasswordInvalid:
-		return {'error': 'PasswordInvalid', 'result': {}}, 401
-	else:
+	elif request.method == 'PUT':
+		data = request.values
+		
+		#check if required key is given
+		for required_key in ('old_password','new_password'):
+			if not required_key in data:
+				return {'error': 'KeyNotFound', 'result': {'key': required_key}}, 400
+		
+		#edit user
+		try:
+			edit_user_password(data['old_password'], data['new_password'])
+		except PasswordInvalid:
+			return {'error': 'PasswordInvalid', 'result': {}}, 400
+		else:
+			return {'error': None, 'result': {}}, 200
+	
+	elif request.method == 'DELETE':
+		#delete user
+		global api_key_map
+		delete_user()
+		del api_key_map[g.api_key]
 		return {'error': None, 'result': {}}, 200
 
 #===================
 # Password endpoints (vault endpoints)
-# These require token authentication
 #===================
 
 @api.route('/vault', methods=['GET','POST'])
 @auth
 def api_vault_list():
+	"""
+	Endpoint: /vault
+	Description: Manage the vault
+	Requires being logged in: Yes
+	Methods:
+		GET:
+			Description: Get the contents of the vault
+			Returns:
+				200:
+					The id, title and username of every password in the vault
+		POST:
+			Description: Add a password to the vault
+			Parameters (url):
+				title (required): the title of the password entry
+				url: the url of the site that the password is for
+				username: the username of the account
+				password: the password of the account
+			Returns:
+				200:
+					The id of the new password entry
+				400:
+					KeyNotFound: One of the required parameters was not given
+	"""
 	if request.method == 'GET':
-		result = list_passwords(user_info_map[request.remote_addr]['hash_encrypted_key'], user_info_map[request.remote_addr]['raw_key'])
-		print(result)
+		result = list_passwords()
 		return {'error': None, 'result': result}, 200
 	
 	elif request.method == 'POST':
@@ -137,8 +266,7 @@ def api_vault_list():
 		if not 'title' in data:
 			return {'error': 'KeyNotFound', 'result': {'key': 'title'}}, 400
 
-		result = add_password(user_info_map[request.remote_addr]['hash_encrypted_key'], user_info_map[request.remote_addr]['raw_key'],
-								title=data['title'],
+		result = add_password(title=data['title'],
 								url=data.get('url'),
 								username=data.get('username'),
 								password=data.get('password'))
@@ -147,28 +275,76 @@ def api_vault_list():
 @api.route('/vault/search', methods=['GET'])
 @auth
 def api_vault_query():
-	query = request.values.to_dict().get('query')
+	"""
+	Endpoint: /vault/search
+	Description: Search through the vault
+	Requires being logged in: Yes
+	Methods:
+		GET:
+			Parameters (url):
+				query (required): The search term
+			Returns:
+				200:
+					The search results, listed like GET /vault
+				400:
+					KeyNotFound: One of the required parameters was not given
+	"""
+	query = request.values.get('query')
 	if query == None:
 		return {'error': 'KeyNotFound', 'result': {'key': 'query'}}, 400
 
-	result = search_passwords(user_info_map[request.remote_addr]['hash_encrypted_key'], user_info_map[request.remote_addr]['raw_key'], query)
+	result = search_passwords(query)
 	return {'error': None, 'result': result}, 200
 	
 @api.route('/vault/<pw_id>', methods=['GET','PUT','DELETE'])
 @auth
 def api_get_password(pw_id: int):
+	"""
+	Endpoint: /vault/<pw_id>
+	Description: Manage a specific password entry in the vault
+	Requires being logged in: Yes
+	URL Parameters:
+		<pw_id>:
+			The id of the password entry
+	Methods:
+		GET:
+			Returns:
+				200:
+					All info about the password entry
+				404:
+					IdNotFound: No password entry found in the vault with the given id
+		PUT:
+			Description: Edit the password entry
+			Parameters (url):
+				title: the new title of the password entry
+				url: the new url of the password entry
+				username: the new username of the password entry
+				password: the new password of the password entry
+			Returns:
+				200:
+					Password updated successfully
+				404:
+					IdNotFound: No password entry found in the vault with the given id
+		DELETE:
+			Description: Delete the password entry
+			Returns:
+				200:
+					Password entry deleted successfully
+				404:
+					IdNotFound: No password entry found in the vault with the given id
+	"""
 	if request.method == 'GET':
 		try:
-			result = get_password(user_info_map[request.remote_addr]['hash_encrypted_key'], user_info_map[request.remote_addr]['raw_key'], pw_id)
+			result = get_password(pw_id)
 		except IdNotFound:
 			return {'error': 'IdNotFound', 'result': {}}, 404
 		else:
 			return {'error': None, 'result': result}, 200
 			
 	elif request.method == 'PUT':
-		data = request.values.to_dict()
+		data = request.values
 		try:
-			result = edit_password(user_info_map[request.remote_addr]['hash_encrypted_key'], user_info_map[request.remote_addr]['raw_key'], pw_id,
+			result = edit_password(pw_id,
 									title=data.get('title'),
 									url=data.get('url'),
 									username=data.get('username'),
@@ -180,17 +356,35 @@ def api_get_password(pw_id: int):
 			
 	elif request.method == 'DELETE':
 		try:
-			delete_password(user_info_map[request.remote_addr]['hash_encrypted_key'], pw_id)
+			delete_password(pw_id)
 		except IdNotFound:
 			return {'error': 'IdNotFound', 'result': {}}, 404
 		else:
 			return {'error': None, 'result': {}}, 200
 
-@api.route('/vault/<pw_id>/check', methods=['GET'])
+@api.route('/vault/check', methods=['GET'])
 @auth
-def api_check_password(pw_id: int):
+def api_check_password():
+	"""
+	Endpoint: /vault/check
+	Description: Check how good a password is
+	Requires being logged in: Yes
+	Methods:
+		GET:
+			Parameters (url):
+				password (required): the password to check
+			Returns:
+				200:
+					The results are in on the password
+				400:
+					KeyNotFound: One of the required parameters was not given
+	"""
+	data = request.values
+	if not 'password' in data:
+		return {'error': 'KeyNotFound', 'result': {'key': 'password'}}, 400
+
 	try:
-		password = get_password(user_info_map[request.remote_addr]['hash_encrypted_key'], user_info_map[request.remote_addr]['raw_key'], pw_id)['password']
+		password = data['password']
 		check_password_popularity(password)
 		check_password_pwned(password)
 	except BadPassword as e:

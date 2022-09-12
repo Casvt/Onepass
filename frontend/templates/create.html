@@ -6,9 +6,10 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	
 	<link rel="stylesheet" href="/static/css/general.css">
-	<link rel="stylesheet" href="/static/css/login.css">
+	<link rel="stylesheet" href="/static/css/login_create.css">
+	<script src="/static/js/create.js" defer></script>
 	
-	<title>Create account | Onepass</title>
+	<title>Create account - Onepass</title>
 </head>
 <body>
 	<main>
@@ -16,15 +17,15 @@
 			<h1>Onepass</h1>
 			<p>Create an account</p>
 		</div>
-		<form id="login-form" method="post">
+		<form id="login-form">
 			<div class="form-entry">
 				<label for="username-input">Username</label>
-				{% if error != '' %}<p class="error-message">{{error}}</p>{% endif %}
-				<input type="text" name="username" id="username-input">
+				<p id="username-error" class="error-message" class="hidden" aria-hidden="true"></p>
+				<input type="text" name="username" id="username-input" autofocus required>
 			</div>
 			<div class="form-entry">
 				<label for="password-input">Password</label>
-				<input type="password" name="password" id="passsword-input">
+				<input type="password" name="password" id="password-input" required>
 			</div>
 			<a href="/" class="create-link">Log in to an account</a>
 		</form>

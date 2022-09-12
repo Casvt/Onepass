@@ -15,10 +15,20 @@ HOST = '0.0.0.0'
 PORT = '8080'
 THREADS = 100
 
-def _folder_path(*folders):
+def _folder_path(*folders) -> str:
+	"""Turn filepaths relative to the project folder into absolute paths
+
+	Returns:
+		str: The absolute filepath
+	"""
 	return join(dirname(__file__), *folders)
 
 def Onepass() -> None:
+	"""The main function of Onepass
+
+	Returns:
+		None
+	"""	
 	#check python version
 	if (version_info.major < 3) or (version_info.major == 3 and version_info.minor < 7):
 		print(f'Error: the minimum python version required is python3.7 (currently {version_info.major}.{version_info.minor}.{version_info.micro})')

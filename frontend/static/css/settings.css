@@ -79,6 +79,18 @@ nav {
 	font-size: 1rem;
 }
 
+#logout-button {
+	border: 0;
+    text-align: left;
+    background: transparent;
+    font-size: 1.2rem;
+}
+
+#logout-button:hover {
+	background-color: darkgray;
+	cursor: pointer;
+}
+
 .current-nav {
 	background-color: gray;
 }

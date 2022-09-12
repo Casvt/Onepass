@@ -7,10 +7,9 @@
 
 	<link rel="stylesheet" href="/static/css/general.css">
 	<link rel="stylesheet" href="/static/css/vault.css">
-	<script src="/static/js/auth_checker.js" defer></script>
 	<script src="/static/js/vault.js" defer></script>
 
-	<title>Vault | Onepass</title>
+	<title>Vault - Onepass</title>
 </head>
 <body>
 	<header>
@@ -27,7 +26,7 @@
 			<button class="search-button" id="search-button">
 				<img class="search-icon" src="/static/img/search.svg" alt="Search icon">
 			</button>
-			<input class="search-input" id="search-input" type="text">
+			<input class="search-input" id="search-input" type="text" placeholder="Search term">
 		</div>
 	</header>
 	<div class="nav-main">
@@ -36,8 +35,12 @@
 				<a class="sub-nav-entry" href="/vault/add-password">Add password</a>
 				<a class="sub-nav-entry" href="/check-password">Check password</a>
 			<a class="nav-entry" href="/settings">Settings</a>
+			<button class="nav-entry" id="logout-button">Logout</button>
 		</nav>
-		<main id="vault"></main>
+		<div>
+			<p class="no-result-error hidden" id="no-result-error" aria-hidden="true">No results</p>
+			<main id="vault"></main>
+		</div>
 	</div>
 </body>
 </html>

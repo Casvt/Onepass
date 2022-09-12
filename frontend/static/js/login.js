@@ -1,13 +1,10 @@
-document.getElementById('login-form').setAttribute('action','javascript:login();')
-
 function login() {
 	const data = {
 		'username': document.getElementById('username-input').value,
 		'password': document.getElementById('password-input').value
 	};
-	fetch('/', {
-		'method': 'POST',
-		'body': JSON.stringify(data)
+	fetch(`/api/auth/login?username=${data.username}&password=${data.password}`, {
+		'method': 'POST'
 	})
 	.then(response => {
 		// catch errors
@@ -15,8 +12,12 @@ function login() {
 			return Promise.reject(response.status);
 		};
 		
-		document.getElementById('username-error').classList.add('hidden');
-		document.getElementById('password-error').classList.add('hidden');
+		var el = document.getElementById('username-error');
+		el.classList.add('hidden');
+		el.setAttribute('aria-hidden','true');
+		var el = document.getElementById('password-error');
+		el.classList.add('hidden');
+		el.setAttribute('aria-hidden','true');
 
 		return response.json();
 	})
@@ -26,15 +27,25 @@ function login() {
 	})
 	.catch(e => {
 		if (e === 404) {
-			const el = document.getElementById('username-error');
+			var el = document.getElementById('username-error');
 			el.innerText = '*Username not found';
 			el.classList.remove('hidden');
-			document.getElementById('password-error').classList.add('hidden');
+			el.setAttribute('aria-hidden','false');
+			var el = document.getElementById('password-error');
+			el.classList.add('hidden');
+			el.setAttribute('aria-hidden','true');
 		} else if (e === 401) {
-			const el = document.getElementById('password-error');
+			var el = document.getElementById('password-error');
 			el.innerText = '*Password incorrect';
 			el.classList.remove('hidden');
-			document.getElementById('username-error').classList.add('hidden');
+			el.setAttribute('aria-hidden','false');
+			var el = document.getElementById('username-error');
+			el.classList.add('hidden');
+			el.setAttribute('aria-hidden','true');
 		};
 	})
 }
+
+// code run on load
+
+document.getElementById('login-form').setAttribute('action','javascript:login();')

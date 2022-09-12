@@ -10,7 +10,7 @@
 	<script src="/static/js/auth_checker.js" defer></script>
 	<script src="/static/js/settings.js" defer></script>
 
-	<title>Settings | Onepass</title>
+	<title>Settings - Onepass</title>
 </head>
 <body>
 	<header>
@@ -27,14 +27,12 @@
 				<a class="sub-nav-entry" href="/vault/add-password">Add password</a>
 				<a class="sub-nav-entry" href="/check-password">Check password</a>
 			<a class="nav-entry current-nav" href="/settings">Settings</a>
+			<button class="nav-entry" id="logout-button">Logout</button>
 		</nav>
 		<main id="settings">
 			<h2>Reset master password</h2>
-			<form class="reset-form" method="post">
-				<div>
-					<label for="edit_username">Username</label>
-					<input type="text" name="username" id="edit_username">
-				</div>
+			<form class="reset-form" id="reset-form">
+				<p id="password-error" class="error-message hidden" aria-hidden="true">*Old password incorrect</p>
 				<div>
 					<label for="old_password">Old password</label>
 					<input type="password" name="old_password" id="old_password">
@@ -46,17 +44,7 @@
 				<button type="submit" class="button edit_password">Change</button>
 			</form>
 			<h2>Delete account</h2>
-			<form class="reset-form" id="delete-form">
-				<div>
-					<label for="old_password">Username</label>
-					<input type="text" name="username" id="username">
-				</div>
-				<div>
-					<label for="new_password">Password</label>
-					<input type="password" name="password" id="password">
-				</div>
-				<button type="submit" class="button delete_account" id="delete-account">Delete</button>
-			</form>
+			<button class="button delete_account" id="delete-account">Delete</button>
 		</main>
 	</div>
 </body>

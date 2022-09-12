@@ -1,19 +1,13 @@
-document.getElementById('login-form').setAttribute('action','javascript:checkPassword();')
-document.getElementById('password-input').addEventListener('keydown', e => {
+function passwordShortcut(e) {
 	if (e.key === 'Enter') {
 		document.getElementById('password-input').blur();
 		checkPassword();
 	};
-})
+}
 
 function checkPassword() {
-	const data = {
-		'password': document.getElementById('password-input').value
-	};
-	fetch('/check-password', {
-		'method': 'POST',
-		'body': JSON.stringify(data)
-	})
+	const password = document.getElementById('password-input').value;
+	fetch(`/api/vault/check?password=${password}&api_key=${sessionStorage.getItem('api_key')}`)
 	.then(response => {
 		// catch errors
 		if (!response.ok) {
@@ -32,6 +26,13 @@ function checkPassword() {
 		};
 	})
 	.catch(e => {
-		console.log(e);
+		if (e === 401) {
+			window.location.href = '/';
+		};
 	})
 }
+
+// code run on load
+
+document.getElementById('login-form').setAttribute('action','javascript:checkPassword();')
+document.getElementById('password-input').addEventListener('keydown', e => passwordShortcut(e))

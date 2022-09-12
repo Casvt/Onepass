@@ -1,21 +1,20 @@
-if (sessionStorage.getItem('api_key') === null) {
-	window.location.href = '/';
-}
+// this script is included in some html documents to run on load
+// this acts as a check for authentication
+// this is not needed everywhere because often there is already a request being made on load that handles it
+// if this script is included, it means that no request is made on load (to check auth) so this script will do it then
 
-fetch('/?api_key=' + sessionStorage.getItem('api_key'), {
-	'method': 'PUT'
-})
+// code run on load
+
+fetch(`/api/auth/status?api_key=${sessionStorage.getItem('api_key')}`)
 .then(response => {
-	return response.text()
+	// catch errors
+	if (!response.ok) {
+		return Promise.reject(response.status);
+	};
+	return
 })
-.then(text => {
-	if (text === 'INVALID') {
+.catch(e => {
+	if (e === 401) {
 		window.location.href = '/';
-		return
 	};
 })
-
-const input = document.getElementById('apikey-input')
-if (input != null) {
-	input.value = sessionStorage.getItem('api_key');
-}
