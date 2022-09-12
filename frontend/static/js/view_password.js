@@ -17,51 +17,67 @@ function togglePassword() {
 	};
 }
 
+function editPassword() {
+	const data = {
+		'title': document.getElementById('title-input').value,
+		'url': document.getElementById('url-input').value,
+		'username': document.getElementById('username-input').value,
+		'password': document.getElementById('password-input').value
+	}
+	fetch(`/api/vault/${id}?title=${data.title}&url=${data.url}&username=${data.username}&password=${data.password}&api_key=${sessionStorage.getItem('api_key')}`, {
+		'method': 'PUT'
+	})
+	.then(response => {
+		// catch errors
+		if (!response.ok) {
+			return Promise.reject(response.status);
+		};
+
+		window.location.href = `/vault/${id}`
+	})
+	.catch(e => {
+		if (e === 404) {
+			window.location.href = '/vault';
+		} else if (e === 401) {
+			window.location.href = '/';
+		};
+	})
+}
+
 function deletePassword() {
-	fetch(`/vault/${id}?api_key=${sessionStorage.getItem('api_key')}`, {
+	fetch(`/api/vault/${id}?api_key=${sessionStorage.getItem('api_key')}`, {
 		'method': 'DELETE'
 	})
 	.then(response => {
 		// catch errors
 		if (!response.ok) {
 			return Promise.reject(response.status);
-		} else {
-			return response.json();
 		};
-	})
-	.then(json => {
-		if (json.error === 'redirected to login') {
-			window.location.href = '/';
-		} else {
-			window.location.href = '/vault';
-		};
-		return
+
+		window.location.href = '/vault';
 	})
 	.catch(e => {
-		console.log(e);
 		if (e === 404) {
-			window.location.href = '/not-found';
+			window.location.href = '/vault';
+		} else if (e === 401) {
+			window.location.href = '/';
 		};
 	})
 }
 
+// code run on load
+
 const id = window.location.pathname.split('/').at(-1)
-fetch(`/vault/${id}?api_key=${sessionStorage.getItem('api_key')}`, {
-	'method': 'PUT'
-})
+fetch(`/api/vault/${id}?api_key=${sessionStorage.getItem('api_key')}`)
 .then(response => {
 	// catch errors
 	if (!response.ok) {
 		return Promise.reject(response.status);
-	} else {
-		return response.json();
 	};
+
+	return response.json();
 })
 .then(json => {
-	if (json.error === 'redirect to login') {
-		window.location.href = '/';
-		return
-	}
 	const data = json.result;
 	document.getElementById('title-input').value = data.title;
 	document.getElementById('url-input').value = data.url;
@@ -69,11 +85,13 @@ fetch(`/vault/${id}?api_key=${sessionStorage.getItem('api_key')}`, {
 	document.getElementById('password-input').value = data.password;
 })
 .catch(e => {
-	console.log(e);
 	if (e === 404) {
 		window.location.href = '/not-found';
+	} else if (e === 401) {
+		window.location.href = '/';
 	};
 })
 
 document.getElementById('show-password-button').addEventListener('click', e => togglePassword())
 document.getElementById('delete-button').addEventListener('click', e => deletePassword())
+document.getElementById('edit-form').setAttribute('action','javascript:editPassword();')

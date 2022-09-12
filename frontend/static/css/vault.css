@@ -68,15 +68,21 @@ header {
 	background-color: transparent;
 	color: var(--light-color);
 
-	border-bottom: 3px solid var(--light-color);
+	border-bottom: 2px solid var(--light-color);
 
 	font-size: 1.4rem;
 }
 
 .search-input:focus {
 	outline: 2px solid var(--light-color);
-	border-bottom: 0px;
+	border: 0px;
 	border-radius: 2px;
+}
+
+.search-input::placeholder {
+	color: var(--light-color);
+	font-size: 1.2rem;
+	opacity: .7;
 }
 
 .nav-main {
@@ -118,6 +124,18 @@ nav {
 	font-size: 1rem;
 }
 
+#logout-button {
+	border: 0;
+    text-align: left;
+    background: transparent;
+    font-size: 1.2rem;
+}
+
+#logout-button:hover {
+	background-color: darkgray;
+	cursor: pointer;
+}
+
 .current-nav {
 	background-color: gray;
 }
@@ -152,6 +170,14 @@ main {
 .vault-entry:hover,
 .vault-entry:focus {
 	background-color: gray;
+}
+
+.no-result-error {
+	padding: 1rem;
+	font-size: 4rem;
+	width: 100%;
+	color: lightgray;
+	text-align: center;
 }
 
 @media (max-width: 720px) {

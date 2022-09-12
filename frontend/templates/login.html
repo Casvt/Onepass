@@ -6,10 +6,10 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	
 	<link rel="stylesheet" href="/static/css/general.css">
-	<link rel="stylesheet" href="/static/css/login.css">
+	<link rel="stylesheet" href="/static/css/login_create.css">
 	<script src="/static/js/login.js" defer></script>
 	
-	<title>Login | Onepass</title>
+	<title>Login - Onepass</title>
 </head>
 <body>
 	<main>
@@ -20,13 +20,13 @@
 		<form id="login-form">
 			<div class="form-entry">
 				<label for="username-input">Username</label>
-				<p id="username-error" class="error-message" class="hidden"></p>
-				<input type="text" name="username" id="username-input" autofocus>
+				<p id="username-error" class="error-message hidden" aria-hidden="true"></p>
+				<input type="text" name="username" id="username-input" autofocus required>
 			</div>
 			<div class="form-entry">
 				<label for="password-input">Password</label>
-				<p id="password-error" class="error-message" class="hidden"></p>
-				<input type="password" name="password" id="password-input">
+				<p id="password-error" class="error-message hidden" aria-hidden="true"></p>
+				<input type="password" name="password" id="password-input" required>
 			</div>
 			<a href="/create" class="create-link">Create an account</a>
 		</form>
