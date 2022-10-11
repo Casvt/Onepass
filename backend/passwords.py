@@ -47,7 +47,7 @@ def add_password(title: str, url: str=None, username: str=None, password: str=No
 	cursor.execute(f"""
 		INSERT INTO `{hash_key}`(title, url, username, password)
 		VALUES (?,?,?,?)
-	""", data.values())
+	""", list(data.values()))
 	id = cursor.lastrowid
 
 	return id
