@@ -24,29 +24,30 @@ def add_password(title: str, url: str=None, username: str=None, password: str=No
 	"""
 	raw_key, hash_key = get_key()
 
-	insert_keys = ['title']
-	insert_values = [encrypt(raw_key, title.encode())]
+	data = {
+		'title': encrypt(raw_key, title.encode()),
+		'url': None,
+		'username': None,
+		'password': None
+	}
 	del title
 	if url != None:
-		insert_keys.append('url')
-		insert_values.append(encrypt(raw_key, url.encode()))
+		data['url'] = encrypt(raw_key, url.encode())
 		del url
 	if username != None:
-		insert_keys.append('username')
-		insert_values.append(encrypt(raw_key, username.encode()))
+		data['username'] = encrypt(raw_key, username.encode())
 		del username
 	if password != None:
-		insert_keys.append('password')
-		insert_values.append(encrypt(raw_key, password.encode()))
+		data['password'] = encrypt(raw_key, password.encode())
 		del password
 	del raw_key
 
 	cursor = get_db()
 
 	cursor.execute(f"""
-		INSERT INTO `{hash_key}`({','.join(insert_keys)})
-		VALUES ({','.join(['?'] * len(insert_values))})
-	""", insert_values)
+		INSERT INTO `{hash_key}`(title, url, username, password)
+		VALUES (?,?,?,?)
+	""", data.values())
 	id = cursor.lastrowid
 
 	return id
@@ -98,35 +99,29 @@ def edit_password(
 	raw_key, hash_key = get_key()
 
 	#check if password exists
-	cursor.execute(f"SELECT id FROM `{hash_key}` WHERE id = ?", (id,))
-	if cursor.fetchone() == None:
+	cursor.execute(f"SELECT title, url, username, password FROM `{hash_key}` WHERE id = ?", (id,))
+	data = dict(cursor.fetchone() or {})
+	if not data:
 		raise IdNotFound
 
-	insert_keys = []
-	insert_values = []
-
 	if title != None:
-		insert_keys.append('title = ?')
-		insert_values.append(encrypt(raw_key, title.encode()))
+		data['title'] = encrypt(raw_key, title.encode())
 		del title
 	if url != None:
-		insert_keys.append('url = ?')
-		insert_values.append(encrypt(raw_key, url.encode()))
+		data['url'] = encrypt(raw_key, url.encode())
 		del url
 	if username != None:
-		insert_keys.append('username = ?')
-		insert_values.append(encrypt(raw_key, username.encode()))
+		data['username'] = encrypt(raw_key, username.encode())
 		del username
 	if password != None:
-		insert_keys.append('password = ?')
-		insert_values.append(encrypt(raw_key, password.encode()))
+		data['password'] = encrypt(raw_key, password.encode())
 		del password
 
 	cursor.execute(f"""
 		UPDATE `{hash_key}`
-		SET {','.join(insert_keys)}
+		SET title = ?, url = ?, username = ?, password = ?
 		WHERE id = ?
-	""", insert_values + [id])
+	""", list(data.values()) + [id])
 
 	return get_password(id)
 
@@ -161,8 +156,7 @@ def list_passwords() -> List[dict]:
 	"""
 	cursor = get_db(output_type='dict')
 
-	raw_key = decrypt(g.raw_api_key.encode(), g.user_info['key'], encode=True)
-	hash_key = hash_password(g.user_info['salt'], raw_key).decode()
+	raw_key, hash_key = get_key()
 	cursor.execute(f"SELECT id, title, username FROM `{hash_key}`;")
 	return sorted([{k: decrypt(raw_key, bytes(v)).decode() if not (k == 'id' or v == None) else v for k, v in dict(e).items()} for e in cursor.fetchall()], key=lambda i: (i['title'], i['username']))
 
@@ -215,10 +209,10 @@ def check_password_pwned(password: str) -> None:
 
 	Raises:
 		BadPassword: The password has been pwned
-	
+
 	Returns:
 		None: The password has not been pwned and thus passes the check
-	"""	
+	"""
 	hash = sha1(password.encode('utf-8')).hexdigest().upper()
 	count = int(dict(map(lambda e: e.split(':'), request.urlopen(f'https://api.pwnedpasswords.com/range/{hash[:5]}').read().decode().split('\r\n'))).get(hash[5:], 0))
 	if count > 0:

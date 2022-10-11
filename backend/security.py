@@ -29,7 +29,7 @@ def generate_key(password: str) -> Tuple[bytes, bytes, str]:
 
 	Returns:
 		Tuple[bytes, bytes, str]: The salt (1), encrypted key (2) and hash of key (3)
-	"""		
+	"""
 	#hash the master password
 	salt = token_bytes()
 	hashed_password = hash_password(salt, password.encode('utf-8'))
@@ -38,7 +38,7 @@ def generate_key(password: str) -> Tuple[bytes, bytes, str]:
 	#encrypt key with hashed master password as cipher
 	key = Fernet.generate_key()
 	encrypted_key = encrypt(key=hashed_password, data=key)
-	
+
 	#hash key
 	hash_key = hash_password(salt, key).decode()
 
@@ -109,7 +109,7 @@ def decrypt(key: bytes, encrypted_data: bytes, encode=False) -> bytes:
 
 	Returns:
 		bytes: The decrypted data
-	"""	
+	"""
 	if encode == True:
 		cipher = Fernet(urlsafe_b64encode(key))
 	else:

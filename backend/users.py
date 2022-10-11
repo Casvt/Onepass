@@ -27,13 +27,10 @@ def register_user(username: str, password: str) -> int:
 	cursor = get_db()
 
 	#check if username is valid
-	if username in ONEPASS_INVALID_USERNAMES:
+	if username in ONEPASS_INVALID_USERNAMES or username.isdigit():
 		raise UsernameInvalid
-	if username.isdigit():
+	if filter(lambda c: not c in ONEPASS_USERNAME_CHARACTERS, username):
 		raise UsernameInvalid
-	for i in username:
-		if not str(i) in ONEPASS_USERNAME_CHARACTERS:
-			raise UsernameInvalid(f'The following character is not allowed: {str(i)}')
 
 	#check if username isn't already taken
 	cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
@@ -105,12 +102,8 @@ def edit_user_password(old_password: str, new_password: str) -> None:
 	Returns:
 		None: password successfully changed
 	"""
-	access_user(str(g.user_info['user_id']), old_password)
+	raw_key, user_id, salt = access_user(str(g.user_info['user_id']), old_password)
 	cursor = get_db()
-
-	raw_key = get_key()[0]
-	cursor.execute("SELECT salt FROM users WHERE id = ?;", (g.user_info['user_id'],))
-	salt = cursor.fetchone()[0]
 
 	#encrypt raw key with new password
 	new_hashed_password = hash_password(salt, new_password.encode())
@@ -118,7 +111,7 @@ def edit_user_password(old_password: str, new_password: str) -> None:
 	new_encrypted_key = encrypt(new_hashed_password, raw_key)
 
 	#insert new encrypted key
-	cursor.execute("UPDATE users SET key = ? WHERE id = ?;", (new_encrypted_key, g.user_info['user_id']))
+	cursor.execute("UPDATE users SET key = ? WHERE id = ?;", (new_encrypted_key, user_id))
 
 	return
 
