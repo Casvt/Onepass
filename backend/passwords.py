@@ -192,11 +192,11 @@ def check_password_popularity(password: str) -> None:
 	Returns:
 		None: The password is not found in the list and thus passes the check
 	"""
-	path_to_file = join(dirname(__file__), 'lists', 'million_most_used_passwords.txt')
-	most_used_passwords = open(path_to_file, 'r').read().split('\n')
-
-	if password in most_used_passwords:
-		place_in_list = str(f'{most_used_passwords.index(password) + 1:_}').replace('_','.')
+	cursor = get_db()
+	cursor.execute("SELECT rowid FROM most_used_passwords WHERE password = ?", (password,))
+	result = cursor.fetchone()
+	if not result is None:
+		place_in_list = f'{result[0]:_}'.replace('_','.')
 		raise BadPassword(f'Password is at place {place_in_list} of 1.000.000 in the list of most used passwords')
 
 	return
@@ -213,9 +213,9 @@ def check_password_pwned(password: str) -> None:
 	Returns:
 		None: The password has not been pwned and thus passes the check
 	"""
-	hash = sha1(password.encode('utf-8')).hexdigest().upper()
+	hash = sha1(password.encode()).hexdigest().upper()
 	count = int(dict(map(lambda e: e.split(':'), request.urlopen(f'https://api.pwnedpasswords.com/range/{hash[:5]}').read().decode().split('\r\n'))).get(hash[5:], 0))
 	if count > 0:
-		raise BadPassword(f'Password has been seen {str(f"{count:_}").replace("_",".")} times before in database leaks')
+		raise BadPassword(f'Password has been seen {f"{count:_}".replace("_",".")} times before in database leaks')
 
 	return

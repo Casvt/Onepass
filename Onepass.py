@@ -13,7 +13,7 @@ from os import urandom
 
 HOST = '0.0.0.0'
 PORT = '8080'
-THREADS = 100
+THREADS = 10
 
 def _folder_path(*folders) -> str:
 	"""Turn filepaths relative to the project folder into absolute paths
@@ -28,7 +28,7 @@ def Onepass() -> None:
 
 	Returns:
 		None
-	"""	
+	"""
 	#check python version
 	if (version_info.major < 3) or (version_info.major == 3 and version_info.minor < 7):
 		print(f'Error: the minimum python version required is python3.7 (currently {version_info.major}.{version_info.minor}.{version_info.micro})')
@@ -77,7 +77,7 @@ def Onepass() -> None:
 	server.run()
 
 	print('\nBye')
-	return None
+	return
 
 if __name__ == "__main__":
 	Onepass()
