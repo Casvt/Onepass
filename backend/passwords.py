@@ -1,221 +1,278 @@
-#-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
-from os.path import dirname, join
-from urllib import request
 from hashlib import sha1
-from typing import List
-from flask import g
+from typing import List, Literal, Union
+from urllib import request
 
-from backend.custom_exceptions import BadPassword, IdNotFound
-from backend.security import encrypt, decrypt, hash_password, get_key
+from backend.custom_exceptions import PasswordNotFound
 from backend.db import get_db
+from backend.security import Crypt
 
-def add_password(title: str, url: str=None, username: str=None, password: str=None) -> int:
-	"""Add a password to the vault
+class _CheckPassword:
+	"""Check if a password is considered "safe"
+	"""	
+	def __init__(self, password: str):
+		self._checks = [
+			self._in_top_million,
+			self._pwned
+		]
+		self.password = password
 
-	Args:
-		title (str): The title of the entry
-		url (str, optional): The url of the entry. Defaults to None.
-		username (str, optional): The username of the entry. Defaults to None.
-		password (str, optional): The password of the entry. Defaults to None.
+	def check_password(self) -> dict:
+		"""Run all checks on the password
 
-	Returns:
-		int: The id of the new entry
-	"""
-	raw_key, hash_key = get_key()
+		Returns:
+			dict: The result of the checks
+		"""		
+		for check in self._checks:
+			result = check()
+			if not result is None:
+				return result
 
-	data = {
-		'title': encrypt(raw_key, title.encode()),
-		'url': None,
-		'username': None,
-		'password': None
+		return {"place": -1, "message": "No problems found with the password!"}
+
+	def _in_top_million(self) -> Union[dict, None]:
+		"""Check if password is in top 1.000.000 passwords list
+		"""
+		result = get_db().execute(
+			"SELECT rowid FROM most_used_passwords WHERE password = ?",
+			(self.password,)
+		).fetchone()
+
+		if result is not None:
+			place_in_list = f"{result[0]:_}".replace("_", ".")
+			return {
+				"place": place_in_list,
+				"message": f"Password is at place {place_in_list} of 1.000.000 in the list of most used passwords",
+			}
+		return
+		
+	def _pwned(self) -> Union[dict, None]:
+		"""Check if password has been pwned according to pwnedpasswords.com
+		"""
+		hash = sha1(self.password.encode()).hexdigest().upper()
+		pwned_range = dict(
+			map(
+				lambda e: e.split(":"),
+				request.urlopen(f"https://api.pwnedpasswords.com/range/{hash[:5]}").read().decode().split("\r\n")
+			)
+		)
+		count = int(pwned_range.get(hash[5:], 0))
+		if count > 0:
+			place_in_list = f"{count:_}".replace("_", ".")
+			return {
+				"place": place_in_list,
+				"message": f"Password has been seen {place_in_list} times before in database leaks",
+			}
+		return
+
+class Password:
+	"""Represents a password in the vault of the user
+	"""	
+	def __init__(self, password_id: int, key: bytes):
+		self.id = password_id
+		self.key = key
+
+		# check if pw exists
+		if not get_db().exists("SELECT id FROM vault WHERE id = ?", (self.id,)):
+			raise PasswordNotFound
+
+	def get(self, _raw: bool = False) -> dict:
+		"""Get all info about the password
+
+		Args:
+			_raw (bool, optional): Returns the info without decrypting it. Defaults to False.
+
+		Returns:
+			dict: The info about the password
+		"""		
+		# fetch password
+		password = dict(get_db(dict).execute(
+			"SELECT id, title, url, username, password FROM vault WHERE id = ?",
+			(self.id,)
+		).fetchone())
+
+		if _raw == False:
+			# decrypt everything
+			return Crypt(self.key).decrypt(password)
+
+		return dict(password)
+
+	def check(self) -> dict:
+		"""Check if the password is considered "safe"
+
+		Returns:
+			dict: The check results
+		"""		
+		password: str = self.get()["password"]
+		return _CheckPassword(password).check_password()
+
+	def update(
+		self,
+		title: str = None,
+		url: str = None,
+		username: str = None,
+		password: str = None,
+	) -> dict:
+		"""Edit the password
+
+		Args:
+			title (str, optional): The new title. Defaults to None.
+			url (str, optional): The new url. Defaults to None.
+			username (str, optional): The new username. Defaults to None.
+			password (str, optional): The new password. Defaults to None.
+
+		Returns:
+			dict: The new password info
+		"""		
+		# encrypt all data
+		pw_data = {
+			"title": title,
+			"url": url,
+			"username": username,
+			"password": password,
+		}
+		pw_data = Crypt(self.key).encrypt(pw_data)
+
+		# get current data and update it with new values
+		current_data = self.get(_raw=True)
+		current_data.update(pw_data)
+
+		# update vault
+		get_db().execute(
+			"""
+			UPDATE vault
+			SET title=?, url=?, username=?, password=?
+			WHERE id = ?;
+		""", (
+			current_data["title"],
+			current_data["url"],
+			current_data["username"],
+			current_data["password"],
+			self.id
+		))
+
+		return self.get()
+
+	def delete(self) -> None:
+		"""Delete the password from the vault
+		"""		
+		get_db().execute("DELETE FROM vault WHERE id = ?", (self.id,))
+		return
+
+class Vault:
+	"""Represents the vault of the user account
+	"""	
+	sort_functions = {
+		'title': (lambda p: (p['title'], p['username']), False),
+		'title_reversed': (lambda p: (p['title'], p['username']), True),
+		'date_added': (lambda p: p['id'], False),
+		'date_added_reversed': (lambda p: p['id'], True)
 	}
-	del title
-	if url != None:
-		data['url'] = encrypt(raw_key, url.encode())
-		del url
-	if username != None:
-		data['username'] = encrypt(raw_key, username.encode())
-		del username
-	if password != None:
-		data['password'] = encrypt(raw_key, password.encode())
-		del password
-	del raw_key
+	
+	def __init__(self, user_id: int, key: bytes):
+		self.user_id = user_id
+		self.key = key
 
-	cursor = get_db()
+	def fetchall(self, sort_by: Literal["title", "title_reversed", "date_added", "date_added_reversed"] = "title") -> List[dict]:
+		"""Get all passwords from the vault
 
-	cursor.execute(f"""
-		INSERT INTO `{hash_key}`(title, url, username, password)
-		VALUES (?,?,?,?)
-	""", list(data.values()))
-	id = cursor.lastrowid
+		Args:
+			sort_by (Literal["title", "title_reversed", "date_added", "date_added_reversed"], optional): How to sort the result. Defaults to "title".
 
-	return id
+		Returns:
+			List[dict]: The id, title, url and username of each entry in the vault of the user account
+		"""		
+		sort_function = self.sort_functions.get(
+			sort_by,
+			self.sort_functions['title']
+		)
 
-def get_password(id: int) -> dict:
-	"""Get a password from the vault
+		# fetch vault
+		passwords: list = get_db(dict).execute(
+			f"SELECT id, title, url, username FROM vault WHERE user_id = ?",
+			(self.user_id,)
+		).fetchall()
 
-	Args:
-		id (int): The id of the password entry
+		# decrypt everything
+		c = Crypt(self.key)
+		for i, password in enumerate(passwords):
+			passwords[i] = c.decrypt(dict(password))
 
-	Raises:
-		IdNotFound: No password entry found with that id in the vault
+		# sort result
+		passwords.sort(key=sort_function[0], reverse=sort_function[1])
 
-	Returns:
-		dict: title, url, username and password in decrypted form
-	"""
-	cursor = get_db(output_type='dict')
-	raw_key, hash_key = get_key()
+		return passwords
 
-	#check if password exists
-	cursor.execute(f"SELECT id, title, url, username, password FROM `{hash_key}` WHERE id = ?", (id,))
-	result = cursor.fetchone()
-	if result == None:
-		raise IdNotFound
+	def search(self, query: str) -> List[dict]:
+		"""Search for passwords in the vault
 
-	info = {k: decrypt(raw_key, bytes(v)).decode() if not (k == 'id' or v == None) else v for k, v in dict(result).items()}
-	return info
+		Args:
+			query (str): The term to search for
 
-def edit_password(
-	id: int,
-	title: str=None, url: str=None, username: str=None, password: str=None,
-) -> dict:
-	"""Edit a password entry in the vault
+		Returns:
+			List[dict]: All passwords that match. Similar output to self.fetchall
+		"""		
+		query = query.lower()
+		passwords = self.fetchall()
+		passwords = list(filter(
+			lambda p: (
+				query in p["title"].lower()
+				or query in p["username"].lower()
+				or query in p["url"].lower()
+			),
+			passwords
+		))
+		return passwords
 
-	Args:
-		id (int): The id of the password entry
-		title (str, optional): The new value for the title. Defaults to None.
-		url (str, optional): The new value for the url. Defaults to None.
-		username (str, optional): The new value for the username. Defaults to None.
-		password (str, optional): The new value for the password. Defaults to None.
+	def fetchone(self, id: int) -> Password:
+		"""Get one password from the vault
 
-	Raises:
-		IdNotFound: No password entry found with that id in the vault
+		Args:
+			id (int): The id of the password to fetch
 
-	Returns:
-		dict: The (new) info of the password entry
-	"""
-	cursor = get_db()
-	raw_key, hash_key = get_key()
+		Returns:
+			Password: A Password instance of the password
+		"""		
+		return Password(id, self.key)
 
-	#check if password exists
-	cursor.execute(f"SELECT title, url, username, password FROM `{hash_key}` WHERE id = ?", (id,))
-	data = dict(cursor.fetchone() or {})
-	if not data:
-		raise IdNotFound
+	def add(
+		self,
+		title: str,
+		url: str = None,
+		username: str = None, password: str = None
+	) -> dict:
+		"""Add a password to the vault
 
-	if title != None:
-		data['title'] = encrypt(raw_key, title.encode())
-		del title
-	if url != None:
-		data['url'] = encrypt(raw_key, url.encode())
-		del url
-	if username != None:
-		data['username'] = encrypt(raw_key, username.encode())
-		del username
-	if password != None:
-		data['password'] = encrypt(raw_key, password.encode())
-		del password
+		Args:
+			title (str): The title of the entry
+			url (str, optional): The url of the entry. Defaults to None.
+			username (str, optional): The username of the entry. Defaults to None.
+			password (str, optional): The password of the entry. Defaults to None.
 
-	cursor.execute(f"""
-		UPDATE `{hash_key}`
-		SET title = ?, url = ?, username = ?, password = ?
-		WHERE id = ?
-	""", list(data.values()) + [id])
+		Returns:
+			dict: The info about the new password
+		"""		
+		# encrypt all data
+		pw_data = {
+			"title": title,
+			"url": url,
+			"username": username,
+			"password": password,
+		}
+		pw_data = Crypt(self.key).encrypt(pw_data)
 
-	return get_password(id)
+		# insert into vault
+		id = get_db().execute("""
+			INSERT INTO vault(user_id, title, url, username, password)
+			VALUES (?,?,?,?,?);
+		""", (
+			self.user_id,
+			pw_data["title"],
+			pw_data["url"],
+			pw_data["username"],
+			pw_data["password"],
+		)).lastrowid
 
-def delete_password(id: int) -> None:
-	"""Remove a password entry from the vault
-
-	Args:
-		id (int): The id of the password entry
-
-	Raises:
-		IdNotFound: No password entry found with that id in the vault
-
-	Returns:
-		None: Password entry successfully removed
-	"""
-	cursor = get_db()
-	hash_key = get_key()[1]
-
-	cursor.execute(f"SELECT * FROM `{hash_key}` WHERE id = ?", (id,))
-	if cursor.fetchone() == None:
-		return IdNotFound
-
-	cursor.execute(f"DELETE FROM `{hash_key}` WHERE id = ?", (id,))
-
-	return
-
-def list_passwords() -> List[dict]:
-	"""List all passwords in the vault
-
-	Returns:
-		list: The id, title and username of every password entry
-	"""
-	cursor = get_db(output_type='dict')
-
-	raw_key, hash_key = get_key()
-	cursor.execute(f"SELECT id, title, username FROM `{hash_key}`;")
-	return sorted([{k: decrypt(raw_key, bytes(v)).decode() if not (k == 'id' or v == None) else v for k, v in dict(e).items()} for e in cursor.fetchall()], key=lambda i: (i['title'], i['username']))
-
-def search_passwords(query: str) -> List[dict]:
-	"""Query the vault with a search term (username or title needs to contain or match query for entry to match)
-
-	Args:
-		query (str): The term to search for
-
-	Returns:
-		list: The id, title and username of every matching password entry
-	"""
-	result = list_passwords()
-	query = query.lower()
-	filtered_items = []
-	for i in result:
-		for e in (i['title'], i['username']):
-			if query in e.lower():
-				filtered_items.append(i)
-				break
-
-	return filtered_items
-
-def check_password_popularity(password: str) -> None:
-	"""Check if a password is "bad". By default, this would mean it is in the 1 million most used passwords list
-
-	Args:
-		password (str): The password to check
-
-	Raises:
-		BadPassword: The password is found in the list and thus considered "bad"
-
-	Returns:
-		None: The password is not found in the list and thus passes the check
-	"""
-	cursor = get_db()
-	cursor.execute("SELECT rowid FROM most_used_passwords WHERE password = ?", (password,))
-	result = cursor.fetchone()
-	if not result is None:
-		place_in_list = f'{result[0]:_}'.replace('_','.')
-		raise BadPassword(f'Password is at place {place_in_list} of 1.000.000 in the list of most used passwords')
-
-	return
-
-def check_password_pwned(password: str) -> None:
-	"""Check if a password is pwned
-
-	Args:
-		password (str): The password to check
-
-	Raises:
-		BadPassword: The password has been pwned
-
-	Returns:
-		None: The password has not been pwned and thus passes the check
-	"""
-	hash = sha1(password.encode()).hexdigest().upper()
-	count = int(dict(map(lambda e: e.split(':'), request.urlopen(f'https://api.pwnedpasswords.com/range/{hash[:5]}').read().decode().split('\r\n'))).get(hash[5:], 0))
-	if count > 0:
-		raise BadPassword(f'Password has been seen {f"{count:_}".replace("_",".")} times before in database leaks')
-
-	return
+		# return info
+		return self.fetchone(id)

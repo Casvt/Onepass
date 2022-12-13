@@ -1,0 +1,111 @@
+body {
+	background-image: url(/static/img/background.jpeg);
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: cover;
+}
+
+.title-container {
+	height: 75vh;
+
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.title {
+	color: var(--color-light);
+
+	font-size: clamp(3rem, 12vw, 5rem);
+}
+
+.background-overlay {
+	height: 100vh;
+}
+
+#window {
+	position: absolute;
+	bottom: -15rem;
+
+	width: 100%;
+
+	padding: min(1rem, 3%);
+	background-color: transparent;
+
+	transition: bottom .6s ease-in-out;
+}
+
+.show-window {
+	bottom: 0 !important;
+}
+
+#login-container,
+#create-container {
+	margin: auto;
+
+	width: min(100%, 45rem);
+	min-height: 10rem;
+
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: 1rem;
+	overflow: auto;
+	
+	padding: clamp(1rem, 7vw, 1.5rem);
+	background-color: var(--color-light);
+	border-radius: 4px;
+	box-shadow: 0px 0px 8px 0 rgb(0 0 0 / 20%),
+				0px 0px 20px 0 rgb(0 0 0 / 19%);
+}
+
+#login-container button,
+#create-container button {
+	border-radius: 2px;
+}
+
+#login-form,
+#create-form {
+	display: flex;
+	gap: 1rem;
+	justify-content: center;
+	align-items: center;
+	flex-wrap: wrap;
+
+	text-align: center;
+}
+
+.input-container {
+	width: min(15rem, 70vw);
+
+	display: flex;
+	flex-direction: column;
+	gap: .5rem;
+}
+
+.input-container input {
+	padding: .2rem;
+}
+
+#login-button,
+#create-button {
+	padding: .5rem;
+	border: 0;
+	background-color: var(--color-accent);
+	color: var(--color-light);
+}
+
+.input-container > *,
+#login-button,
+#create-button {
+	font-size: 1.2rem;
+}
+
+#login-link,
+#create-link {
+	border: 0;
+	padding: .5rem;
+	background-color: var(--color-accent);
+	color: var(--color-light);
+}

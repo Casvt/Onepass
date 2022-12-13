@@ -7,40 +7,115 @@
 
 	<link rel="stylesheet" href="/static/css/general.css">
 	<link rel="stylesheet" href="/static/css/vault.css">
+	<script src="/static/js/cover.js" defer></script>
 	<script src="/static/js/vault.js" defer></script>
 
 	<title>Vault - Onepass</title>
 </head>
 <body>
-	<header>
-		<div class="menu-title-container">
-			<button class="toggle-nav" id="nav-button" aria-label="toggle menu">
-				<img src="/static/img/menu.svg" alt="Menu icon" class="search-icon">
-			</button>
-			<p>Onepass Vault</p>
-			<button class="search-button" id="search-toggle" aria-label="toggle search">
-				<img src="/static/img/search.svg" alt="Search icon" class="search-icon">
-			</button>
+	<!-- cover -->
+	<div id="cover" class="show-window">
+		<div class="windows">
+			<!-- when adding password -->
+			<div id="add-window" class="cover-entry hidden">
+				<h2>Add a new password</h2>
+				<form id="add-form" class="form">
+					<input type="text" id="title-input" placeholder="Title" required>
+					<input type="url" id="url-input" placeholder="URL">
+					<input type="text" id="username-input" placeholder="Username" autocomplete="username">
+					<input type="password" id="password-input" placeholder="Password" autocomplete="new-password">
+					<div class="actions">
+						<button type="button" id="cancel-button">Cancel</button>
+						<button type="submit">Add</button>
+					</div>
+				</form>
+			</div>
+			<!-- when viewing -->
+			<div id="view-window" class="cover-entry hidden">
+				<h2>View password</h2>
+				<p id="check-message" class="hidden"></p>
+				<form id="view-form" class="form">
+					<input type="hidden" id="view-id">
+					<input type="text" id="view-title-input" placeholder="Title" required>
+					<input type="url" id="view-url-input" placeholder="URL">
+					<input type="text" id="view-username-input" placeholder="Username" autocomplete="username">
+					<div class="password-combo">
+						<input type="password" id="view-password-input" placeholder="Password" autocomplete="new-password">
+						<button type="button" id="show-password" class="show-password" aria-label="Show Password">
+							<img id="show-password-icon" src="/static/img/show_password.svg">
+						</button>
+					</div>
+					<div class="actions">
+						<button type="button" id="view-cancel-button">Cancel</button>
+						<button type="button" id="delete-button">Delete</button>
+						<button type="button" id="check-button">Check</button>
+						<button type="submit">Save changes</button>
+					</div>
+				</form>
+			</div>
+			<!-- when changing user settings -->
+			<div id="settings-window" class="cover-entry hidden">
+				<h2>User Settings</h2>
+				<form id="settings-form" class="form">
+					<div class="password-combo">
+						<input type="password" id="new-password-input" placeholder="New Master Password" autocomplete="new-password">
+						<button type="button" id="show-new-password" class="show-password" aria-label="Show Password">
+							<img id="show-new-password-icon" src="/static/img/show_password.svg">
+						</button>
+					</div>
+					<div class="actions">
+						<button type="button" id="settings-cancel-button">Cancel</button>
+						<button type="button" id="delete-account-button">Delete Account</button>
+						<button type="submit">Save Password</button>
+					</div>
+				</form>
+			</div>
+			<!-- when searching or sorting -->
+			<div id="search-window" class="cover-entry hidden">
+				<form id="search-form" class="form">
+					<input type="text" id="search-input" placeholder="Search term">
+					<button type="submit" id="start-search-button">Search</button>
+					<button type="button" id="clear-search-button">Clear</button>
+					<select id="sort-selection">
+						<option value="title" selected="selected">Title</option>
+						<option value="title_reversed">Title reversed</option>
+						<option value="date_added">Date added</option>
+						<option value="date_added_reversed">Date added reversed</option>
+					</select>
+				</form>
+			</div>
+			<!-- when loading page -->
+			<div id="loading-title" class="cover-entry">
+				<h1>Onepass</h1>
+				<!-- javascript disabled screen -->
+				<noscript class="no-javascript">
+					<h2>Javascript is disabled</h2>
+					<p>Onepass can't work without javascript enabled.</p>
+				</noscript>
+			</div>
 		</div>
-		<div class="search-bar" id="search-bar">
-			<button class="search-button" id="search-button">
-				<img class="search-icon" src="/static/img/search.svg" alt="Search icon">
-			</button>
-			<input class="search-input" id="search-input" type="text" placeholder="Search term">
-		</div>
-	</header>
-	<div class="nav-main">
-		<nav id="nav">
-			<a class="nav-entry current-nav" href="/vault">Vault</a>
-				<a class="sub-nav-entry" href="/vault/add-password">Add password</a>
-				<a class="sub-nav-entry" href="/check-password">Check password</a>
-			<a class="nav-entry" href="/settings">Settings</a>
-			<button class="nav-entry" id="logout-button">Logout</button>
+		<!-- at top of screen -->
+		<nav>
+			<div class="left-nav">
+				<button id="add-button" aria-label="Add password" title="Add password"><img src="/static/img/add.svg"></button>
+				<button id="search-button" aria-label="Search" title="Search in vault">
+					<img src="/static/img/search.svg">
+					<img src="/static/img/sort.svg">
+				</button>
+			</div>
+			<div class="right-nav">
+				<p id="username-title"></p>
+				<button id="settings-button" aria-label="User settings" title="User settings"><img src="/static/img/user.svg"></button>
+				<button id="logout-button" aria-label="Logout" title="Logout"><img src="/static/img/logout.svg"></button>
+			</div>
 		</nav>
-		<div>
-			<p class="no-result-error hidden" id="no-result-error" aria-hidden="true">No results</p>
-			<main id="vault"></main>
-		</div>
 	</div>
+	<!-- Keeps the main window below the absolutely placed nav at the top -->
+	<div id="cover-placeholder"></div>
+	<!-- main window -->
+	<main>
+		<p id="no-password-message" class="hidden">No passwords in your vault</p>
+		<div id="vault"></div>
+	</main>
 </body>
 </html>

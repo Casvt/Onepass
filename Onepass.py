@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-from frontend.ui import ui
-from frontend.api import api
-from backend.db import setup_db, close_db
-
-from sys import version_info
-from flask import Flask, redirect, request
-from waitress.server import create_server
-from os.path import join, dirname
 from os import urandom
+from os.path import dirname, join
+from sys import version_info
+
+from flask import Flask, render_template, request
+from waitress.server import create_server
+
+from backend.db import close_db, setup_db
+from frontend.api import api
+from frontend.ui import ui
 
 HOST = '0.0.0.0'
 PORT = '8080'
@@ -23,17 +24,12 @@ def _folder_path(*folders) -> str:
 	"""
 	return join(dirname(__file__), *folders)
 
-def Onepass() -> None:
-	"""The main function of Onepass
+def _create_app() -> Flask:
+	"""Create a Flask app instance
 
 	Returns:
-		None
-	"""
-	#check python version
-	if (version_info.major < 3) or (version_info.major == 3 and version_info.minor < 7):
-		print(f'Error: the minimum python version required is python3.7 (currently {version_info.major}.{version_info.minor}.{version_info.micro})')
-
-	#register web server
+		Flask: The created app instance
+	"""	
 	app = Flask(
 		__name__,
 		template_folder=_folder_path('frontend','templates'),
@@ -44,13 +40,13 @@ def Onepass() -> None:
 	app.config['JSONIFY_PRETTYPRINT_REGULAR'] = True
 	app.config['JSON_SORT_KEYS'] = False
 
-	#add error handlers
+	# Add error handlers
 	@app.errorhandler(404)
 	def not_found(e):
 		if request.path.startswith('/api'):
 			return {'error': 'Not Found', 'result': {}}, 404
 		else:
-			return redirect('/not-found')
+			return render_template('page_not_found.html')
 
 	@app.errorhandler(400)
 	def bad_request(e):
@@ -67,9 +63,25 @@ def Onepass() -> None:
 	app.register_blueprint(ui)
 	app.register_blueprint(api, url_prefix="/api")
 
-	#setup database
+	# Setup closing database
 	app.teardown_appcontext(close_db)
-	setup_db()
+	
+	return app
+
+def Onepass() -> None:
+	"""The main function of Onepass
+
+	Returns:
+		None
+	"""
+	#check python version
+	if (version_info.major < 3) or (version_info.major == 3 and version_info.minor < 7):
+		print('Error: the minimum python version required is python3.7 (currently ' + version_info.major + '.' + version_info.minor + '.' + version_info.micro + ')')
+
+	#register web server
+	app = _create_app()
+	with app.app_context():
+		setup_db()
 
 	#create waitress server	and run
 	server = create_server(app, host=HOST, port=PORT, threads=THREADS)

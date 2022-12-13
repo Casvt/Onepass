@@ -1,35 +1,101 @@
-* {
+*, *::before, *::after {
 	box-sizing: border-box;
 	margin: 0;
-	border: 0;
+	padding: 0;
 }
 
 :root {
-	--dark-color: rgb(53, 53, 53);
-	--light-color: rgb(255, 255, 255);
-	--accent-color: rgb(5, 168, 170);
-	--dark-accent-color: rgb(18, 36, 63);
-	--error-color: rgb(219, 84, 97);
-	--success-color: rgb(84, 219, 104);
-	--gradient: linear-gradient(225deg, var(--accent-color) 0%, var(--dark-accent-color) 100%);
+	--color-light: white;
+	--color-dark: rgb(53, 53, 53);
+	--color-accent: rgb(5, 168, 170);
+	--color-accent-dark: rgb(18, 36, 63);
+	--color-error: rgb(219, 84, 97);
+	--color-success: rgb(84, 219, 104);
+
+	--nav-height: clamp(4rem, 9vw, 5rem);
 	
-	--nav-width: clamp(11.2rem, 20%, 15rem);
+	--cover-speed: .7s;
+	--cover-search-height: 7vh;
+	--login-create-switch: .5s;
 }
 
-body {
-	background-color: var(--light-color);
-	height: 100vh;
+/* Default properties */
+img {
+	width: 100%;
 }
 
-main {
-	overflow-y: auto;
+button:hover {
+	cursor: pointer;
 }
 
-.error-message {
-	color: var(--error-color) !important;
+/* Utility classes */
+.hidden {
+	display: none !important;
+}
+
+.error {
+	color: var(--color-error) !important;
 	font-size: 1rem !important;
 }
 
-.hidden {
-	display: none;
+.success {
+	color: var(--color-success) !important;
+	font-size: 1rem !important;
+}
+
+/* Default styling */
+body {
+	overflow-y: hidden;
+}
+
+#cover {
+	position: absolute;
+	z-index: 1;
+
+	width: 100%;
+
+	background-color: var(--color-accent);
+	color: var(--color-light);
+	border-bottom-left-radius: 5px;
+	border-bottom-right-radius: 5px;
+	
+	transition: transform var(--cover-speed) ease-in-out;
+	transform: translateY(-100vh);
+}
+
+#cover.show-window {
+	transform: translateY(0vh);
+}
+
+#cover.show-search-window {
+	transform: translateY(calc(-100vh + var(--cover-search-height)));
+}
+
+.windows {
+	min-height: 100vh;
+
+	display: flex;
+	flex-direction: column-reverse;	
+}
+
+.cover-entry {
+	padding: 1rem;
+}
+
+#loading-title {
+	height: 100vh;
+
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+#loading-title > *,
+.no-javascript > * {
+	font-size: 2.5rem;
+}
+
+.no-javascript {
+	text-align: center;
 }

@@ -2,24 +2,30 @@
 
 class UsernameTaken(Exception):
 	"""The username is already taken"""
-	pass
+	api_response = {'error': 'UsernameTaken', 'result': {}, 'code': 400}
 
 class UsernameInvalid(Exception):
 	"""The username contains invalid characters"""
-	pass
+	api_response = {'error': 'UsernameInvalid', 'result': {}, 'code': 400}
 
-class UsernameNotFound(Exception):
-	"""The username requested can not be found"""
-	pass
+class UserNotFound(Exception):
+	"""The user requested by id or username can not be found"""
+	api_response = {'error': 'UserNotFound', 'result': {}, 'code': 404}
 
-class PasswordInvalid(Exception):
+class AccessUnauthorized(Exception):
 	"""The password given is not correct"""
-	pass
+	api_response = {'error': 'AccessUnauthorized', 'result': {}, 'code': 401}
 
-class IdNotFound(Exception):
+class PasswordNotFound(Exception):
 	"""The password in the vault with the id can not be found"""
-	pass
+	api_response = {'error': 'PasswordNotFound', 'result': {}, 'code': 404}
 
-class BadPassword(Exception):
-	"""The password is considered bad. By default, this means it is in the 1 million most used passwords list"""
-	pass
+class KeyNotFound(Exception):
+	"""A key was not found in the input that is required to be given"""	
+	def __init__(self, key: str=''):
+		self.key = key
+		super().__init__(self.key)
+
+	@property
+	def api_response(self):
+		return {'error': 'KeyNotFound', 'result': {'key': self.key}, 'code': 400}

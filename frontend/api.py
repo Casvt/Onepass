@@ -1,21 +1,18 @@
 #-*- coding: utf-8 -*-
 
-from backend.users import access_user, delete_user, register_user, edit_user_password
-from backend.passwords import list_passwords, add_password, search_passwords, get_password, edit_password, delete_password, check_password_popularity, check_password_pwned
-from backend.security import encrypt
-from backend.custom_exceptions import *
-
-from flask import Blueprint, request, g
-from hashlib import sha1
 from os import urandom
 from time import time
+from typing import Any, Tuple, Union
+
+from flask import Blueprint, g, request
+
+from backend.custom_exceptions import (AccessUnauthorized, KeyNotFound,
+                                       PasswordNotFound, UsernameInvalid,
+                                       UsernameTaken, UserNotFound)
+from backend.users import User, register_user
 
 api = Blueprint('api', __name__)
 api_key_map = {}
-
-#===================
-# Authentication endpoints
-#===================
 
 """
 AUTHENTICATION:
@@ -27,29 +24,59 @@ AUTHENTICATION:
 	If the api key supplied has expired, 401 'ApiKeyExpired' is returned.
 """
 
+def return_api(result: Any, error: str=None, code: int=200) -> Tuple[dict, int]:
+	return {'error': error, 'result': result}, code
+
 def auth(method):
 	"""Used as decorator and, if applied to route, restricts the route to authorized users and supplies user specific info
 	"""
 	def wrapper(*args,**kwargs):
-		global api_key_map
-		api_key = sha1(request.values.get('api_key','').encode()).hexdigest()
-		if api_key_map.get(api_key, {}).get('exp', 0) > time():
-			g.raw_api_key = request.values.get('api_key','')
-			g.api_key = api_key
-			g.user_info = api_key_map[api_key]
-			return method(*args, **kwargs)
-		else:
-			if not api_key in api_key_map:
-				#api key not registered
-				return {'error': 'ApiKeyInvalid', 'result': {}}, 401
-			else:
-				#api key expired
-				del api_key_map[api_key]
-				return {'error': 'ApiKeyExpired', 'result': {}}, 401
+		hashed_api_key = hash(request.values.get('api_key',''))
+		if not hashed_api_key in api_key_map:
+			return return_api({}, 'ApiKeyInvalid', 401)
+		
+		exp = api_key_map[hashed_api_key]['exp']
+		if exp <= time():
+			return return_api({}, 'ApiKeyExpired', 401)
+		
+		# Api key valid
+		g.hashed_api_key = hashed_api_key
+		g.exp = exp
+		g.user_data = api_key_map[hashed_api_key]['user_data']
+		return method(*args, **kwargs)
+
 	wrapper.__name__ = method.__name__
 	return wrapper
 
+def error_handler(method):
+	"""Catches the errors that can occur in the endpoint and returns the correct api error
+	"""
+	def wrapper(*args, **kwargs):
+		try:
+			return method(*args, **kwargs)
+		except (UsernameTaken, UsernameInvalid, UserNotFound,
+				AccessUnauthorized, PasswordNotFound, KeyNotFound) as e:
+			return return_api(**e.api_response)
+
+	wrapper.__name__ = method.__name__
+	return wrapper
+
+def check_keys(data: Union[dict, str, None], keys: Tuple[str,...]) -> None:
+	if isinstance(data, dict):
+		for key in keys:
+			if not key in data:
+				raise KeyNotFound(key)
+	else:
+		if data is None:
+			raise KeyNotFound(keys[0])
+	return
+
+#===================
+# Authentication endpoints
+#===================
+
 @api.route('/auth/login', methods=['POST'])
+@error_handler
 def api_login():
 	"""
 	Endpoint: /auth/login
@@ -57,9 +84,9 @@ def api_login():
 	Requires being logged in: No
 	Methods:
 		POST:
-			Parameters (url):
+			Parameters (body (content-type: application/json)):
 				username (required): the username of the user account
-				password (required): the password of the user account
+				master_password (required): the password of the user account
 			Returns:
 				200:
 					The apikey to use for further requests and expiration time (epoch)
@@ -70,35 +97,33 @@ def api_login():
 				404:
 					UsernameNotFound: The username was not found
 	"""
-	global api_key_map
-	data = request.values.to_dict()
+	data = request.get_json()
 
 	#check if required keys are given
-	for required_key in ('username','password'):
-		if not required_key in data:
-			return {'error': 'KeyNotFound', 'result': {'key': required_key}}, 400
+	check_keys(data, ('username', 'master_password'))
 
 	#check credentials
-	try:
-		raw_key, user_id, salt = access_user(data['username'], data['password'])
-	except UsernameNotFound:
-		return {'error': 'UsernameNotFound', 'result': {}}, 404
-	except PasswordInvalid:
-		return {'error': 'PasswordInvalid', 'result': {}}, 401
-	else:
-		#login valid
-		while 1:
-			api_key = sha1(urandom(32)).hexdigest()[:32]
-			hashed_api_key = sha1(api_key.encode()).hexdigest()
-			if not hashed_api_key in api_key_map:
-				break
-		encrypted_raw_key = encrypt(api_key.encode(), raw_key, encode=True)
-		del raw_key
-		exp = time() + 3600
-		api_key_map[hashed_api_key] = {'key': encrypted_raw_key, 'salt': salt, 'user_id': user_id, 'exp': exp}
-		return {'error': None, 'result': {'api_key': api_key, 'expires': exp}}, 200
+	user = User(data['username'], data['master_password'])
+
+	#login valid
+	while 1:
+		api_key = urandom(16).hex() # <- length api key / 2
+		hashed_api_key = hash(api_key)
+		if not hashed_api_key in api_key_map:
+			break
+	exp = time() + 3600
+	api_key_map.update({
+		hashed_api_key: {
+			'exp': exp,
+			'user_data': user
+		}
+	})
+
+	result = {'api_key': api_key, 'expires': exp}
+	return return_api(result)
 
 @api.route('/auth/logout', methods=['POST'])
+@error_handler
 @auth
 def api_logout():
 	"""
@@ -111,11 +136,11 @@ def api_logout():
 				200:
 					Logout successful
 	"""
-	global api_key_map
-	del api_key_map[g.api_key]
-	return {'error': None, 'result': {}}, 200
+	api_key_map.pop(g.hashed_api_key)
+	return return_api({})
 
 @api.route('/auth/status', methods=['GET'])
+@error_handler
 @auth
 def api_status():
 	"""
@@ -126,17 +151,20 @@ def api_status():
 		GET:
 			Returns:
 				200:
-					The id of the user account and the expiration time of the api key (epoch)
+					The username of the logged in account and the expiration time of the api key (epoch)
 	"""
-	exp = api_key_map[g.api_key]['exp']
-	user_id = api_key_map[g.api_key]['user_id']
-	return {'error': None, 'result': {'expires': exp, 'user_id': user_id}}, 200
+	result = {
+		'expires': api_key_map[g.hashed_api_key]['exp'],
+		'username': api_key_map[g.hashed_api_key]['user_data'].username
+	}
+	return return_api(result)
 
 #===================
 # User endpoints
 #===================
 
 @api.route('/user/add', methods=['POST'])
+@error_handler
 def api_add_user():
 	"""
 	Endpoint: /user/add
@@ -144,9 +172,9 @@ def api_add_user():
 	Requires being logged in: No
 	Methods:
 		POST:
-			Parameters (url):
+			Parameters (body (content-type: application/json)):
 				username (required): the username of the new user account
-				password (required): the password of the new user account
+				master_password (required): the password of the new user account
 			Returns:
 				201:
 					The user id of the new user account
@@ -155,24 +183,17 @@ def api_add_user():
 					UsernameInvalid: The username given is not allowed
 					UsernameTaken: The username given is already in use
 	"""
-	data = request.values
+	data = request.get_json()
 
 	#check if required keys are given
-	for required_key in ('username','password'):
-		if not required_key in data:
-			return {'error': 'KeyNotFound', 'result': {'key': required_key}}, 400
+	check_keys(data, ('username', 'master_password'))
 	
 	#add user
-	try:
-		user_id = register_user(data['username'], data['password'])
-	except UsernameInvalid:
-		return {'error': 'UsernameInvalid', 'result': {}}, 400
-	except UsernameTaken:
-		return {'error': 'UsernameTaken', 'result': {}}, 400
-	else:
-		return {'error': None, 'result': {'user_id': user_id}}, 201
+	user_id = register_user(data['username'], data['master_password'])
+	return return_api({'user_id': user_id}, code=201)
 		
-@api.route('/user', methods=['GET','PUT','DELETE'])
+@api.route('/user', methods=['PUT','DELETE'])
+@error_handler
 @auth
 def api_manage_user():
 	"""
@@ -180,58 +201,43 @@ def api_manage_user():
 	Description: Manage a user account
 	Requires being logged in: Yes
 	Methods:
-		GET:
-			Returns:
-				200:
-					The user id of the user account
 		PUT:
 			Description: Change the master password of the user account
-			Parameters (url):
-				old_password (required): the current password of the user account
-				new_password (required): the new password of the user account
+			Parameters (body (content-type: application/json)):
+				new_master_password (required): the new password of the user account
 			Returns:
 				200:
 					Password updated successfully
 				400:
 					KeyNotFound: One of the required parameters was not given
-					PasswordInvalid: The current password is incorrect
 		DELETE:
 			Description: Delete the user account
 			Returns:
 				200:
 					Account deleted successfully
 	"""
-	if request.method == 'GET':
-		return {'error': None, 'result': {'user_id': g.user_info['user_id']}}, 200
-
-	elif request.method == 'PUT':
-		data = request.values
+	if request.method == 'PUT':
+		data = request.get_json()
 		
 		#check if required key is given
-		for required_key in ('old_password','new_password'):
-			if not required_key in data:
-				return {'error': 'KeyNotFound', 'result': {'key': required_key}}, 400
+		check_keys(data, ('new_master_password',))
 		
 		#edit user
-		try:
-			edit_user_password(data['old_password'], data['new_password'])
-		except PasswordInvalid:
-			return {'error': 'PasswordInvalid', 'result': {}}, 400
-		else:
-			return {'error': None, 'result': {}}, 200
+		g.user_data.edit_master_password(data['new_master_password'])
+		return return_api({})
 	
 	elif request.method == 'DELETE':
 		#delete user
-		global api_key_map
-		delete_user()
-		del api_key_map[g.api_key]
-		return {'error': None, 'result': {}}, 200
+		g.user_data.delete()
+		api_key_map.pop(g.hashed_api_key)
+		return return_api({})
 
 #===================
-# Password endpoints (vault endpoints)
+# Vault endpoints
 #===================
 
 @api.route('/vault', methods=['GET','POST'])
+@error_handler
 @auth
 def api_vault_list():
 	"""
@@ -241,12 +247,14 @@ def api_vault_list():
 	Methods:
 		GET:
 			Description: Get the contents of the vault
+			Parameters (url):
+				sort_by: how to sort the result. Allowed values are 'title', 'title_reversed', 'date_added' and 'date_added_reversed'
 			Returns:
 				200:
-					The id, title and username of every password in the vault
+					The id, title, url and username of every password in the vault
 		POST:
 			Description: Add a password to the vault
-			Parameters (url):
+			Parameters (body (content-type: application/json)):
 				title (required): the title of the password entry
 				url: the url of the site that the password is for
 				username: the username of the account
@@ -258,21 +266,22 @@ def api_vault_list():
 					KeyNotFound: One of the required parameters was not given
 	"""
 	if request.method == 'GET':
-		result = list_passwords()
-		return {'error': None, 'result': result}, 200
+		sort_by = request.values.get('sort_by','title')
+		result = g.user_data.vault.fetchall(sort_by=sort_by)
+		return return_api(result)
 	
 	elif request.method == 'POST':
-		data = request.values.to_dict()
-		if not 'title' in data:
-			return {'error': 'KeyNotFound', 'result': {'key': 'title'}}, 400
+		data = request.get_json()
+		check_keys(data, ('title',))
 
-		result = add_password(title=data['title'],
+		result = g.user_data.vault.add(title=data['title'],
 								url=data.get('url'),
 								username=data.get('username'),
 								password=data.get('password'))
-		return {'error': None, 'result': {'id': result}}, 201
+		return return_api(result.get(), code=201)
 
 @api.route('/vault/search', methods=['GET'])
+@error_handler
 @auth
 def api_vault_query():
 	"""
@@ -290,13 +299,13 @@ def api_vault_query():
 					KeyNotFound: One of the required parameters was not given
 	"""
 	query = request.values.get('query')
-	if query == None:
-		return {'error': 'KeyNotFound', 'result': {'key': 'query'}}, 400
+	check_keys(query, ('query',))
 
-	result = search_passwords(query)
-	return {'error': None, 'result': result}, 200
-	
+	result = g.user_data.vault.search(query)
+	return return_api(result)
+
 @api.route('/vault/<pw_id>', methods=['GET','PUT','DELETE'])
+@error_handler
 @auth
 def api_get_password(pw_id: int):
 	"""
@@ -312,10 +321,10 @@ def api_get_password(pw_id: int):
 				200:
 					All info about the password entry
 				404:
-					IdNotFound: No password entry found in the vault with the given id
+					No password entry found in the vault with the given id
 		PUT:
 			Description: Edit the password entry
-			Parameters (url):
+			Parameters (body (content-type: application/json)):
 				title: the new title of the password entry
 				url: the new url of the password entry
 				username: the new username of the password entry
@@ -324,70 +333,49 @@ def api_get_password(pw_id: int):
 				200:
 					Password updated successfully
 				404:
-					IdNotFound: No password entry found in the vault with the given id
+					No password entry found in the vault with the given id
 		DELETE:
 			Description: Delete the password entry
 			Returns:
 				200:
 					Password entry deleted successfully
 				404:
-					IdNotFound: No password entry found in the vault with the given id
+					No password entry found in the vault with the given id
 	"""
 	if request.method == 'GET':
-		try:
-			result = get_password(pw_id)
-		except IdNotFound:
-			return {'error': 'IdNotFound', 'result': {}}, 404
-		else:
-			return {'error': None, 'result': result}, 200
+		result = g.user_data.vault.fetchone(pw_id)
+		return return_api(result.get())
 			
 	elif request.method == 'PUT':
-		data = request.values
-		try:
-			result = edit_password(pw_id,
-									title=data.get('title'),
-									url=data.get('url'),
-									username=data.get('username'),
-									password=data.get('password'))
-		except IdNotFound:
-			return {'error': 'IdNotFound', 'result': {}}, 404
-		else:
-			return {'error': None, 'result': result}, 200
+		data = request.get_json()
+		result = g.user_data.vault.fetchone(pw_id).update(title=data.get('title'),
+														url=data.get('url'),
+														username=data.get('username'),
+														password=data.get('password'))
+		return return_api(result)
 			
 	elif request.method == 'DELETE':
-		try:
-			delete_password(pw_id)
-		except IdNotFound:
-			return {'error': 'IdNotFound', 'result': {}}, 404
-		else:
-			return {'error': None, 'result': {}}, 200
+		g.user_data.vault.fetchone(pw_id).delete()
+		return return_api({})
 
-@api.route('/vault/check', methods=['GET'])
+@api.route('/vault/<pw_id>/check', methods=['GET'])
+@error_handler
 @auth
-def api_check_password():
+def api_check_password(pw_id: int):
 	"""
-	Endpoint: /vault/check
+	Endpoint: /vault/<pw_id>/check
 	Description: Check how good a password is
 	Requires being logged in: Yes
+	URL Parameters:
+		<pw_id>:
+			The id of the password entry
 	Methods:
 		GET:
-			Parameters (url):
-				password (required): the password to check
 			Returns:
 				200:
 					The results are in on the password
-				400:
-					KeyNotFound: One of the required parameters was not given
+				404:
+					No password entry found in the vault with the given id
 	"""
-	data = request.values
-	if not 'password' in data:
-		return {'error': 'KeyNotFound', 'result': {'key': 'password'}}, 400
-
-	try:
-		password = data['password']
-		check_password_popularity(password)
-		check_password_pwned(password)
-	except BadPassword as e:
-		return {'error': None, 'result': {'message': str(e)}}, 200
-	else:
-		return {'error': None, 'result': {'message': 'No problems found with password!'}}, 200
+	result = g.user_data.vault.fetchone(pw_id).check()
+	return return_api(result)

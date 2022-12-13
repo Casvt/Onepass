@@ -4,33 +4,55 @@
 	<meta charset="UTF-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	
+
 	<link rel="stylesheet" href="/static/css/general.css">
-	<link rel="stylesheet" href="/static/css/login_create.css">
+	<link rel="stylesheet" href="/static/css/login.css">
+	<script src="/static/js/cover.js" defer></script>
 	<script src="/static/js/login.js" defer></script>
-	
+
 	<title>Login - Onepass</title>
 </head>
 <body>
-	<main>
-		<div class="title-text">
+	<!-- cover -->
+	<div id="cover" class="show-window">
+		<div id="loading-title" class="cover-entry">
 			<h1>Onepass</h1>
-			<p>Please log in</p>
+			<!-- javascript disabled screen -->
+			<noscript class="no-javascript">
+				<h2>Javascript is disabled</h2>
+				<p>Onepass can't work without javascript enabled.</p>
+			</noscript>
 		</div>
-		<form id="login-form">
-			<div class="form-entry">
-				<label for="username-input">Username</label>
-				<p id="username-error" class="error-message hidden" aria-hidden="true"></p>
-				<input type="text" name="username" id="username-input" autofocus required>
+	</div>
+	<!-- main window -->
+	<div class="background-overlay">
+		<div class="title-container">
+			<h1 class="title">Onepass</h1>
+		</div>
+		<div id="window">
+			<div id="login-container">
+				<form id="login-form">
+					<div class="input-container">
+						<p class="error hidden" id="username-error" aria-hidden="true">*Username not found</p>
+						<input type="text" id="username-input" placeholder="Username" autocomplete="username" required>
+						<p class="error hidden" id="password-error" aria-hidden="true">*Password incorrect</p>
+						<input type="password" id="password-input" placeholder="Password" autocomplete="current-password" required>
+					</div>
+					<button type="submit" id="login-button">Login</button>
+				</form>
+				<button id="create-link">Or create an account</button>
 			</div>
-			<div class="form-entry">
-				<label for="password-input">Password</label>
-				<p id="password-error" class="error-message hidden" aria-hidden="true"></p>
-				<input type="password" name="password" id="password-input" required>
+			<div id="create-container" class="hidden">
+				<form id="create-form">
+					<div class="input-container">
+						<input type="text" id="create-username-input" placeholder="Username" autocomplete="username" required>
+						<input type="password" id="create-password-input" placeholder="Password" autocomplete="new-password" required>
+					</div>
+					<button type="submit" id="create-button">Create account</button>
+				</form>
+				<button id="login-link">Or log in</button>
 			</div>
-			<a href="/create" class="create-link">Create an account</a>
-		</form>
-		<input class="login-submit" type="submit" value="Login" form="login-form">
-	</main>
+		</div>
+	</div>
 </body>
 </html>
