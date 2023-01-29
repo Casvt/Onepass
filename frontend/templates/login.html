@@ -30,27 +30,29 @@
 			<h1 class="title">Onepass</h1>
 		</div>
 		<div id="window">
-			<div id="login-container">
+			<div id="login-container" class="container">
 				<form id="login-form">
-					<div class="input-container">
-						<p class="error hidden" id="username-error" aria-hidden="true">*Username not found</p>
-						<input type="text" id="username-input" placeholder="Username" autocomplete="username" required>
-						<p class="error hidden" id="password-error" aria-hidden="true">*Password incorrect</p>
-						<input type="password" id="password-input" placeholder="Password" autocomplete="current-password" required>
+					<p class="error hidden" id="username-error" aria-hidden="true">*Username not found</p>
+					<p class="error hidden" id="password-error" aria-hidden="true">*Password incorrect</p>
+					<input type="text" id="username-input" placeholder="Username" autocomplete="username" required>
+					<input type="password" id="password-input" placeholder="Password" autocomplete="current-password" required>
+					<div class="options">
+						<button type="button" id="create-link">Create Account</button>
+						<button type="submit" id="login-button">Login</button>
 					</div>
-					<button type="submit" id="login-button">Login</button>
 				</form>
-				<button id="create-link">Or create an account</button>
 			</div>
-			<div id="create-container" class="hidden">
+			<div id="create-container" class="container hidden">
 				<form id="create-form">
-					<div class="input-container">
-						<input type="text" id="create-username-input" placeholder="Username" autocomplete="username" required>
-						<input type="password" id="create-password-input" placeholder="Password" autocomplete="new-password" required>
+					<p class="error hidden" id="invalid-username-error" aria-hidden="true">*Username invalid</p>
+					<p class="error hidden" id="taken-username-error" aria-hidden="true">*Username taken</p>
+					<input type="text" id="create-username-input" placeholder="Username" autocomplete="username" required>
+					<input type="password" id="create-password-input" placeholder="Password" autocomplete="new-password" required>
+					<div class="options">
+						<button type="button" id="login-link">Log In</button>
+						<button type="submit" id="create-button">Create account</button>
 					</div>
-					<button type="submit" id="create-button">Create account</button>
 				</form>
-				<button id="login-link">Or log in</button>
 			</div>
 		</div>
 	</div>

@@ -1,7 +1,35 @@
+const elements = {
+	'window': document.getElementById('window'),
+	'containers': document.querySelectorAll('[id$="-container"]'),
+
+	'username': document.getElementById('username-input'),
+	'password': document.getElementById('password-input'),
+	'username_new': document.getElementById('create-username-input'),
+	'password_new': document.getElementById('create-password-input'),
+
+	'username_error': document.getElementById('username-error'),
+	'password_error': document.getElementById('password-error'),
+	'username_taken': document.getElementById('taken-username-error'),
+	'username_invalid': document.getElementById('invalid-username-error')
+};
+
+function toggleElement(el, state=null) {
+	if (state === 'show' || (el.classList.contains('hidden') && state === null)) {
+		// Show element
+		el.classList.remove('hidden');
+		el.setAttribute('aria-hidden', 'false');
+	} else {
+		// Hide element
+		el.classList.add('hidden');
+		el.setAttribute('aria-hidden', 'true');
+	};
+	return;
+};
+
 function login() {
 	const data = {
-		'username': document.getElementById('username-input').value,
-		'master_password': document.getElementById('password-input').value
+		'username': elements.username.value,
+		'master_password': elements.password.value
 	};
 	fetch(`/api/auth/login`, {
 		'method': 'POST',
@@ -9,18 +37,16 @@ function login() {
 		'headers': {'Content-Type': 'application/json'}
 	})
 	.then(response => {
+		// Hide any errors that were showing
+		toggleElement(elements.username_error, 'hide');
+		toggleElement(elements.password_error, 'hide');
+		elements.username.classList.remove('error-input');
+		elements.password.classList.remove('error-input');
+
 		// catch errors
 		if (!response.ok) {
 			return Promise.reject(response.status);
 		};
-		
-		// Hide any errors that were showing
-		var el = document.getElementById('username-error');
-		el.classList.add('hidden');
-		el.setAttribute('aria-hidden','true');
-		var el = document.getElementById('password-error');
-		el.classList.add('hidden');
-		el.setAttribute('aria-hidden','true');
 
 		return response.json();
 	})
@@ -34,28 +60,22 @@ function login() {
 	.catch(e => {
 		if (e === 404) {
 			// Username not found
-			var el = document.getElementById('username-error');
-			el.classList.remove('hidden');
-			el.setAttribute('aria-hidden','false');
-			var el = document.getElementById('password-error');
-			el.classList.add('hidden');
-			el.setAttribute('aria-hidden','true');
+			toggleElement(elements.username_error, 'show');
+			toggleElement(elements.password_error, 'hide');
+			elements.username.classList.add('error-input');
 		} else if (e === 401) {
 			// Password incorrect
-			var el = document.getElementById('password-error');
-			el.classList.remove('hidden');
-			el.setAttribute('aria-hidden','false');
-			var el = document.getElementById('username-error');
-			el.classList.add('hidden');
-			el.setAttribute('aria-hidden','true');
+			toggleElement(elements.username_error, 'hide');
+			toggleElement(elements.password_error, 'show');
+			elements.password.classList.add('error-input');
 		};
 	});
 };
 
 function create() {
 	const data = {
-		'username': document.getElementById('create-username-input').value,
-		'master_password': document.getElementById('create-password-input').value
+		'username': elements.username_new.value,
+		'master_password': elements.password_new.value
 	};
 	fetch(`/api/user/add`, {
 		'method': 'POST',
@@ -63,47 +83,54 @@ function create() {
 		'headers': {'Content-Type': 'application/json'}
 	})
 	.then(response => {
-		// catch errors
-		if (!response.ok) {
-			return Promise.reject(response.status);
-		};
+		// Hide any errors that were showing
+		toggleElement(elements.username_invalid, 'hide');
+		toggleElement(elements.username_taken, 'hide');
+		elements.username_new.classList.remove('error-input');
+		elements.password_new.classList.remove('error-input');
 
 		return response.json();
 	})
 	.then(json => {
-		fetch(`/api/auth/login`, {
-			'method': 'POST',
-			'body': JSON.stringify(data),
-			'headers': {'Content-Type': 'application/json'}
-		})
-		.then(response => {
-			return response.json();
-		})
-		.then(json => {
-			sessionStorage.setItem('api_key', json.result.api_key);
-			
-			cover_and_run(() => {
-				window.location.href = '/vault';
-			});
-		});
+		// catch errors
+		if (json.error !== null) {
+			return Promise.reject(json);
+		};
+
+		elements.username.value = data.username;
+		elements.password.value = data.master_password;
+		login();
+		return;
+	})
+	.catch(json => {
+		if (json.error === 'UsernameInvalid') {
+			// Username invalid
+			toggleElement(elements.username_invalid, 'show');
+			toggleElement(elements.username_taken, 'hide');
+			elements.username_new.classList.add('error-input');
+		} else if (json.error === 'UsernameTaken') {
+			// Username taken
+			toggleElement(elements.username_invalid, 'hide');
+			toggleElement(elements.username_taken, 'show');
+			elements.username_new.classList.add('error-input');
+		};
 	});
 };
 
 function toggleWindow() {
-	document.getElementById('window').classList.remove('show-window');
+	elements.window.classList.remove('show-window');
 	setTimeout(() => {
-		document.getElementById('login-container').classList.toggle('hidden');
-		document.getElementById('create-container').classList.toggle('hidden');	
-		document.getElementById('window').classList.add('show-window');
+		elements.containers.forEach(c => c.classList.toggle('hidden'));
+		elements.window.classList.add('show-window');
 	}, 600);
 }
 
 // code run on load
 
 setTimeout(() => {
-	document.getElementById('window').classList.add('show-window');
+	elements.window.classList.add('show-window');
 	setTimeout(() => {
-		document.getElementById('username-input').focus();
+		elements.username.focus();
 	}, 600);
 }, 500);
 

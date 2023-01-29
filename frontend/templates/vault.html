@@ -65,17 +65,25 @@
 					</div>
 					<div class="actions">
 						<button type="button" id="settings-cancel-button">Cancel</button>
-						<button type="button" id="delete-account-button">Delete Account</button>
 						<button type="submit">Save Password</button>
+					</div>
+					<div class="actions">
+						<button type="button" id="delete-account-button">Delete Account</button>
 					</div>
 				</form>
 			</div>
 			<!-- when searching or sorting -->
 			<div id="search-window" class="cover-entry hidden">
-				<form id="search-form" class="form">
-					<input type="text" id="search-input" placeholder="Search term">
-					<button type="submit" id="start-search-button">Search</button>
-					<button type="button" id="clear-search-button">Clear</button>
+				<form id="search-form">
+					<div class="search-bar">
+						<button type="submit" id="start-search-button" title="Start search">
+							<img src="/static/img/search.svg" alt="">
+						</button>
+						<input type="text" id="search-input" placeholder="Search...">
+						<button type="button" id="clear-search-button" title="Clear search">
+							<img src="/static/img/cancel.svg" alt="">
+						</button>
+					</div>
 					<select id="sort-selection">
 						<option value="title" selected="selected">Title</option>
 						<option value="title_reversed">Title reversed</option>

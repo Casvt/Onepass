@@ -25,24 +25,22 @@ body {
 
 #window {
 	position: absolute;
-	bottom: -15rem;
+	bottom: -100%;
 
 	width: 100%;
 
 	padding: min(1rem, 3%);
 	background-color: transparent;
 
-	transition: bottom .6s ease-in-out;
+	transition: bottom .4s ease-in-out;
 }
 
-.show-window {
-	bottom: 0 !important;
+#window.show-window {
+	bottom: 0;
 }
 
-#login-container,
-#create-container {
+.container {
 	margin: auto;
-
 	width: min(100%, 45rem);
 	min-height: 10rem;
 
@@ -54,58 +52,80 @@ body {
 	overflow: auto;
 	
 	padding: clamp(1rem, 7vw, 1.5rem);
-	background-color: var(--color-light);
 	border-radius: 4px;
+	background-color: var(--color-light);
 	box-shadow: 0px 0px 8px 0 rgb(0 0 0 / 20%),
 				0px 0px 20px 0 rgb(0 0 0 / 19%);
 }
 
-#login-container button,
-#create-container button {
-	border-radius: 2px;
-}
-
-#login-form,
-#create-form {
+.container > form {
+	width: 100%;
+	
 	display: flex;
-	gap: 1rem;
+	flex-direction: column;
 	justify-content: center;
 	align-items: center;
 	flex-wrap: wrap;
+	gap: 1rem;
 
 	text-align: center;
 }
 
-.input-container {
-	width: min(15rem, 70vw);
+.container p {
+	flex-grow: 1;
+	width: min(100%, 20rem);
+	margin-bottom: -.75rem;
+	
+	text-align: left;
+	font-size: .9rem;
+}
 
+.container button,
+.container input {
+	padding: .5rem;
+	outline: 0;
+	border: 2px solid var(--color-gray);
+	border-radius: 4px;
+
+	font-size: 1.1rem;
+	
+	transition: border-color .2s ease-in-out;
+}
+
+.container input {
+	flex-grow: 1;
+	width: min(100%, 20rem);
+	
+	color: var(--color-dark);
+}
+
+.container input::placeholder {
+	opacity: .9;
+	
+	font-size: .8rem;
+	
+	transition: opacity .2s linear;
+}
+
+.container input:focus::placeholder {
+	opacity: 0;
+}
+
+.options {
+	flex-grow: 1;
+	width: min(100%, 24rem);
+	
 	display: flex;
-	flex-direction: column;
-	gap: .5rem;
+	justify-content: center;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: .2rem;
 }
 
-.input-container input {
-	padding: .2rem;
+.options > button {
+	width: max(10rem, calc(50% - .1rem));
 }
 
-#login-button,
-#create-button {
-	padding: .5rem;
-	border: 0;
-	background-color: var(--color-accent);
-	color: var(--color-light);
-}
-
-.input-container > *,
-#login-button,
-#create-button {
-	font-size: 1.2rem;
-}
-
-#login-link,
-#create-link {
-	border: 0;
-	padding: .5rem;
-	background-color: var(--color-accent);
-	color: var(--color-light);
+.options > button:hover {
+	border-color: var(--color-accent);
 }

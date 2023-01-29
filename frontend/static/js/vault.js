@@ -23,7 +23,7 @@ function logout() {
 		'method': 'POST'
 	})
 	.then(response => {
-		hide_windows()
+		hide_windows();
 		document.getElementById('loading-title').classList.remove('hidden');
 		// catch errors
 		if (!response.ok) {
