@@ -1,0 +1,9 @@
+version: '3.3'
+services:
+  onepass:
+    container_name: onepass
+    volumes:
+      - 'onepass-db:/app/db'
+    ports:
+      - '8080:8080'
+    image: mrcas/onepass:latest

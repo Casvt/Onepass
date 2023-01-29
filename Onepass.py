@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 
-from os import urandom
-from os.path import dirname, join
+from os import makedirs, urandom
+from os.path import dirname, join, abspath
 from sys import version_info
 
 from flask import Flask, render_template, request
 from waitress.server import create_server
 
-from backend.db import close_db, setup_db
+from backend.db import DBConnection, close_db, setup_db
 from frontend.api import api
 from frontend.ui import ui
 
 HOST = '0.0.0.0'
 PORT = '8080'
 THREADS = 10
+DB_FILENAME = 'db', 'Onepass.db'
 
 def _folder_path(*folders) -> str:
 	"""Turn filepaths relative to the project folder into absolute paths
@@ -22,7 +23,7 @@ def _folder_path(*folders) -> str:
 	Returns:
 		str: The absolute filepath
 	"""
-	return join(dirname(__file__), *folders)
+	return join(dirname(abspath(__file__)), *folders)
 
 def _create_app() -> Flask:
 	"""Create a Flask app instance
@@ -81,6 +82,9 @@ def Onepass() -> None:
 	#register web server
 	app = _create_app()
 	with app.app_context():
+		db_location = _folder_path(*DB_FILENAME)
+		makedirs(dirname(db_location), exist_ok=True)
+		DBConnection.file = db_location
 		setup_db()
 
 	#create waitress server	and run

@@ -1,12 +1,30 @@
 #-*- coding: utf-8 -*-
 
-from sqlite3 import Cursor, Row, connect
+from sqlite3 import Connection, Cursor, Row, connect
+from threading import current_thread
 from typing import Union
 from urllib import request
 
 from flask import g
 
-ONEPASS_DB_FILE = 'Onepass.db'
+__DATABASE_VERSION__ = 1
+
+class Singleton(type):
+	_instances = {}
+	def __call__(cls, *args, **kwargs):
+		i = f'{cls}{current_thread()}'
+		if i not in cls._instances:
+			cls._instances[i] = super(Singleton, cls).__call__(*args, **kwargs)
+			
+		return cls._instances[i]
+
+class DBConnection(Connection, metaclass=Singleton):
+	file = ''
+	
+	def __init__(self, timeout: float) -> None:
+		super().__init__(self.file, timeout=timeout)
+		super().cursor().execute("PRAGMA foreign_keys = ON;")
+		return
 
 class Extended_Cursor(Cursor):
 	"""Extended version of the sqlite3 Cursor object. Adds the exists function.
@@ -38,28 +56,38 @@ def get_db(output_type: Union[dict, tuple]=tuple) -> Extended_Cursor:
 	Returns:
 		Extended_Cursor: The Cursor instance to use
 	"""	
-	if not hasattr(g, 'cursor'):
-		db = connect(ONEPASS_DB_FILE, timeout=20.0)
-		g.cursor = Extended_Cursor(db)
-		if output_type == dict:
-			g.cursor.row_factory = Row
+	try:
+		cursor = g.cursor
+	except AttributeError:
+		db = DBConnection(timeout=20.0)
+		cursor = g.cursor = Extended_Cursor(db)
+		
+	if output_type is dict:
+		cursor.row_factory = Row
 	else:
-		if output_type == tuple and g.cursor.row_factory == Row:
-			g.cursor.row_factory = None
-		elif output_type == dict and g.cursor.row_factory is None:
-			g.cursor.row_factory = Row
-
+		cursor.row_factory = None
 	return g.cursor
 
 def close_db(e=None) -> None:
 	"""Savely closes the database connection
 	"""	
-	if hasattr(g, 'cursor'):
-		db = g.cursor.connection
-		g.cursor.close()
+	try:
+		cursor = g.cursor
+		db = cursor.connection
+		cursor.close()
 		delattr(g, 'cursor')
 		db.commit()
-		db.close()
+	except AttributeError:
+		pass
+	return
+
+def migrate_db(current_db_version: int) -> None:
+	"""
+	Migrate a Onepass database from it's current version
+	to the newest version suppoted by the Onepass version installed.
+	"""
+	print('Migrating database to newer version...')
+	
 	return
 
 def setup_db() -> None:
@@ -80,12 +108,33 @@ def setup_db() -> None:
 			title BLOB,
 			url BLOB,
 			username BLOB,
-			password BLOB
+			password BLOB,
+			
+			FOREIGN KEY (user_id) REFERENCES users(id)
 		);
 		CREATE TABLE IF NOT EXISTS most_used_passwords(
 			password VARCHAR(255) UNIQUE NOT NULL
 		);
+		CREATE TABLE IF NOT EXISTS config(
+			key VARCHAR(255) PRIMARY KEY,
+			value TEXT NOT NULL
+		);
 	""")
+	
+	cursor.execute("""
+		INSERT OR IGNORE INTO config(key, value)
+		VALUES ('database_version', ?);
+		""",
+		(__DATABASE_VERSION__,)
+	)
+	current_db_version = int(cursor.execute("SELECT value FROM config WHERE key = 'database_version' LIMIT 1;").fetchone()[0])
+	if current_db_version < __DATABASE_VERSION__:
+		migrate_db(current_db_version)
+		cursor.execute(
+			"UPDATE config SET value = ? WHERE key = 'database_version' LIMIT 1;",
+			(__DATABASE_VERSION__,)
+		)
+	
 	cursor.execute("SELECT password FROM most_used_passwords LIMIT 1;")
 	if cursor.fetchone() is None:
 		cursor.executemany(
